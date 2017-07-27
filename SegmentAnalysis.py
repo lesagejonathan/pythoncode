@@ -8,13 +8,51 @@ import os
 from skimage.feature import register_translation
 from scipy.ndimage import fourier_shift
 import pickle
-from Signal import *
+# from Signal import *
 
 StackingFunctions = {}
 
 StackingFunctions['Sum'] = lambda x,y: x+y
 StackingFunctions['MaxSum'] = lambda x,y: [x,y][argmax(array([sum(x.ravel()),sum(y.ravel())]))]
 StackingFunctions['MaxValue'] = lambda x,y: [x,y][argmax(array([max(x.ravel()),max(y.ravel())]))]
+
+
+# def ShiftSignal(x,T,fs):
+#
+#     Npad = int(ceil(abs(T)*fs))
+#
+#
+#     X = rfft(x,Npad+len(x),axis=-1)
+#
+#     f = linspace(0,fs/2,len(X))
+#
+#     xs = irfft(exp(-1j*2*pi*f*T)*X,axis=-1)
+#
+#     return xs[0:len(x)]
+#
+# def EstimateProbeDelays(Scans,fsamp,p,h,c=5.92):
+#
+#     M = Scans.shape[0]
+#     N = Scans.shape[1]
+#
+#     x = abs(hilbert(Scans,axis=2))
+#
+#     W = int(round(fsamp*0.25*h/c))
+#
+#
+#     Delays = zeros((M,N))
+#
+#     for m in range(M):
+#
+#         for n in range(N):
+#
+#             T = int(round(fsamp*(2*sqrt((0.5*(n-m)*p)**2 + h**2)/c)))
+#
+#             Delays[m,n] = (argmax(x[m,n,T-W:T+W])+T-W - T)/fsamp
+#
+#
+#     return Delays
+
 
 def CalibrateWedge(Scans,Delays,fsamp,p,c,angle,h):
 
@@ -1569,7 +1607,7 @@ class FMC:
 
             if X is 'sidewall':
 
-                X = array([wp['SideWallPosition']])
+                X = array([wp['SideWallPosition']-1.,wp['SideWallPosition'],wp['SideWallPosition']+1.])
 
             I = zeros((len(Y),len(X)))
 

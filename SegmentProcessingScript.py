@@ -28,6 +28,7 @@ pd = Signal.EstimateProbeDelays(dref['AScans'],dref['SamplingFrequency'],0.6,25.
 d = os.listdir(pth)
 
 d = [dd for dd in d if dd.endswith('.p')]
+d = d[0:3]
 
 def ImageWeld(x):
 
