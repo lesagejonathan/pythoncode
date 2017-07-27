@@ -23,7 +23,7 @@ import multiprocessing
 pth = '/home/jbox/Documents/MicroPulse-L-FBHScans-10DegreeWedge/'
 
 dref = pickle.load(open('/home/jbox/Documents/5L32-25mmReferenceBlock.p','rb'))
-pd = Signal.EstimateProbeDelays(dref['AScans'],dref['SamplingFrequency'],0.6,25.)
+pd = Signal.EstimateProbeDelays(dref['AScans'][0],dref['SamplingFrequency'],0.6,25.)
 
 d = os.listdir(pth)
 
