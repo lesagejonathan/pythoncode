@@ -8,7 +8,7 @@ import os
 from skimage.feature import register_translation
 from scipy.ndimage import fourier_shift
 import pickle
-# from Signal import *
+from Signal import *
 
 StackingFunctions = {}
 
