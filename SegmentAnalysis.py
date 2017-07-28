@@ -1061,7 +1061,7 @@ class FMC:
 
                     for n in range(N):
 
-                        self.AScans[iScan][m,n,:] = ShiftSignal(self.AScans[m,n,:],-ProbeDelays[m,n],elf.SamplingFrequency)
+                        self.AScans[iScan][m,n,:] = ShiftSignal(self.AScans[iScan][m,n,:],-ProbeDelays[m,n],self.SamplingFrequency)
 
 
 
