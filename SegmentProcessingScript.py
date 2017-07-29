@@ -28,11 +28,13 @@ pd = Signal.EstimateProbeDelays(dref['AScans'][0],dref['SamplingFrequency'],0.6,
 d = os.listdir(pth)
 
 d = [dd for dd in d if dd.endswith('.p')]
-d = d[0:3]
+d = d[0:1]
 
 def ImageWeld(x):
 
     print(x)
+
+    print(pd)
 
     wld = pickle.load(open(pth+x,'rb'))
 
