@@ -1029,7 +1029,7 @@ class FMC:
         self.Tend = self.Time[-1]
 
 
-    def Calibrate(self,RefParams=(6,1.),BPParams=(1.0,8.5,2.),Offset=0.75,BWRange = (22.,37.),ProbeDelays=None):
+    def Calibrate(self,RefParams=(10,0.1),BPParams=(1.0,8.5,2.),Offset=0.75,BWRange = (22.,37.),ProbeDelays=None):
 
         from scipy.signal import detrend,tukey,firwin,fftconvolve,hilbert,correlate
 
