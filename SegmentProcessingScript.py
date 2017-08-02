@@ -4,20 +4,6 @@ import pickle
 import os
 import multiprocessing
 
-# def ImageWeld(x):
-#
-#     print(x)
-#
-#     wld = pickle.load(open(pth+x,'rb'))
-#
-#     F = sa.FMC(wld['AScans'],wld['SamplingFrequency'])
-#
-#     F.Calibrate()
-#
-#     F.FusionLineFocus()
-#
-#     return F.FusionLineImages
-#
 
 
 pth = '/home/jbox/Documents/MicroPulse-L-FBHScans-10DegreeWedge/'
@@ -28,7 +14,7 @@ pd = Signal.EstimateProbeDelays(dref['AScans'][0],dref['SamplingFrequency'],0.6,
 d = os.listdir(pth)
 
 d = [dd for dd in d if dd.endswith('.p')]
-d = d[0:2]
+# d = d[0:2]
 
 def ImageWeld(x):
 
@@ -43,17 +29,19 @@ def ImageWeld(x):
 
     F.FusionLineFocus()
 
+    pickle.dump(open('/home/jbox/Documents/MP-CustomTFM-'+x,'wb'))
+
     return F.FusionLineImages
 
 
-pool = multiprocessing.Pool(multiprocessing.cpu_count())
+pool = multiprocessing.Pool(2)
 II = pool.map(ImageWeld, d)
 
 I = {}
 
 for i in range(len(d)):
 
-    I[dd.strip('.p')] = II[i]
+    I[d[i].strip('.p')] = II[i]
 
 
-pickle.dump(I,open('/home/jbox/Documents/CustomTFM-MicroPulse-L-FBH-10DegreeWedge.p','wb'))
+pickle.dump(I,open('/home/jbox/Documents/MP-L-FBH-10Degree-CustomTFM.p','wb'))
