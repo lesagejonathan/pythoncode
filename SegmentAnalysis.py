@@ -1095,6 +1095,8 @@ class FMC:
 
             # h = EstimateReference(real(p[int(round((Tw+5*BWRange[0]/self.PieceParameters['Velocity']['Longitudinal'])*self.SamplingFrequency))::]),Nwin,RefParams[1])
 
+            print(iScan)
+
             h = EstimateReference(real(p[int(round((Tw+1*BWRange[0]/self.PieceParameters['Velocity']['Longitudinal'])*self.SamplingFrequency))::]),Nwin,RefParams[1])
 
 
