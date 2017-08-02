@@ -1057,15 +1057,10 @@ class FMC:
                 self.AScans[iScan][m,:,0:int(T/dt)] = 0.
                 self.AScans[iScan][m,:,int(T/dt)::] = detrend(self.AScans[iScan][m,:,int(T/dt)::],bp=[0,int((L-(T/dt))/3),L-(int(T/dt))])
 
-                if ProbeDelays is not None:
-
-                    for n in range(N):
-
-                        self.AScans[iScan][m,n,:] = ShiftSignal(self.AScans[iScan][m,n,:],-ProbeDelays[m,n],self.SamplingFrequency)
-
 
 
         self.GetSpectrum()
+
 
         Tw = 2*(self.WedgeParameters['Height']+N*sin(phi)*self.ProbeParameters['Pitch']/2)/self.WedgeParameters['Velocity']
         Tbw = ((Tw + 2*BWRange[0]/self.PieceParameters['Velocity']['Longitudinal'],Tw + 2*BWRange[1]/self.PieceParameters['Velocity']['Longitudinal']),(Tw + 4*BWRange[0]/self.PieceParameters['Velocity']['Longitudinal'],Tw + 4*BWRange[1]/self.PieceParameters['Velocity']['Longitudinal']))
@@ -1095,7 +1090,6 @@ class FMC:
 
             # h = EstimateReference(real(p[int(round((Tw+5*BWRange[0]/self.PieceParameters['Velocity']['Longitudinal'])*self.SamplingFrequency))::]),Nwin,RefParams[1])
 
-            print(iScan)
 
             h = EstimateReference(real(p[int(round((Tw+1*BWRange[0]/self.PieceParameters['Velocity']['Longitudinal'])*self.SamplingFrequency))::]),Nwin,RefParams[1])
 
@@ -1107,7 +1101,14 @@ class FMC:
                 for n in range(N):
 
 
-                    self.AScans[iScan][m,n,:] = correlate(Standardize(self.AScans[iScan][m,n,:]),h,mode='same')
+                    if ProbeDelays is not None:
+
+                        self.AScans[iScan][m,n,:] = ShiftSignal(correlate(Standardize(self.AScans[iScan][m,n,:]),h,mode='same'),-ProbeDelays[m,n],self.SamplingFrequency)
+
+                    else:
+
+
+                        self.AScans[iScan][m,n,:] = correlate(Standardize(self.AScans[iScan][m,n,:]),h,mode='same')
 
 
             P = abs(self.PlaneWaveFocus(iScan,(-self.WedgeParameters['Angle'],-self.WedgeParameters['Angle'])))
@@ -1411,7 +1412,7 @@ class FMC:
 
 
 
-    def EstimateSideWall(self,ScanIndex,SWRange = (29.,45.),dl=0.5):
+    def EstimateSideWall(self,ScanIndex,SWRange = (34.,45.),dl=0.5):
 
         # Lref = len(self.Reference)
 
