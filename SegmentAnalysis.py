@@ -1410,7 +1410,7 @@ class FMC:
 
 
 
-    def EstimateSideWall(self,ScanIndex,SWRange = (34.,45.),dl=0.3):
+    def EstimateSideWall(self,ScanIndex,SWRange = (32.,48.),dl=0.3):
 
         # Lref = len(self.Reference)
 
