@@ -1,6 +1,6 @@
 from numpy import *
 from numpy.fft import *
-from matplotlib.pylab import *
+# from matplotlib.pylab import *
 from misc import *
 from scipy.ndimage import *
 # from skimage.filters import *
@@ -950,12 +950,12 @@ class FMC:
         self.PathList = []
 
         self.PathList.append([('Cap',('T','T','T')),('Cap',('L','T','T'))])
-        self.PathList.append([('Cap',('T','T','T')),('Cap',('L','L','L'))])
-        self.PathList.append([('Cap',('L','L','T')),('Cap',('L','L','L'))])
+        # self.PathList.append([('Cap',('T','T','T')),('Cap',('L','L','L'))])
+        # self.PathList.append([('Cap',('L','L','T')),('Cap',('L','L','L'))])
 
 
 
-        # self.PathList.append([('Cap',('T','L','T')),('Cap',('T','L','L'))])
+        self.PathList.append([('Cap',('T','L','T')),('Cap',('T','L','L'))])
         # self.PathList.append([('Cap',('L','L','T')),('Cap',('L','L','L'))])
 
 
@@ -1058,6 +1058,12 @@ class FMC:
                 self.AScans[iScan][m,:,int(T/dt)::] = detrend(self.AScans[iScan][m,:,int(T/dt)::],bp=[0,int((L-(T/dt))/3),L-(int(T/dt))])
 
 
+                if ProbeDelays is not None:
+
+                    for n in range(N):
+
+                        self.AScans[iScan][m,n,:] = ShiftSignal(self.AScans[iScan][m,n,:],-ProbeDelays[m,n],self.SamplingFrequency)
+
 
         self.GetSpectrum()
 
@@ -1100,21 +1106,13 @@ class FMC:
             for m in range(N):
                 for n in range(N):
 
+                    self.AScans[iScan][m,n,:] = correlate(Standardize(self.AScans[iScan][m,n,:]),h,mode='same')
 
-                    if ProbeDelays is not None:
-
-                        self.AScans[iScan][m,n,:] = ShiftSignal(correlate(Standardize(self.AScans[iScan][m,n,:]),h,mode='same'),-ProbeDelays[m,n],self.SamplingFrequency)
-
-                    else:
-
-
-                        self.AScans[iScan][m,n,:] = correlate(Standardize(self.AScans[iScan][m,n,:]),h,mode='same')
 
 
             P = abs(self.PlaneWaveFocus(iScan,(-self.WedgeParameters['Angle'],-self.WedgeParameters['Angle'])))
 
-            # plot(P)
-            # show()
+
 
             indbwmax = (argmax(P[indbw[0][0]:indbw[0][1]+1])+indbw[0][0], argmax(P[indbw[1][0]:indbw[1][1]+1])+indbw[1][0])
 
@@ -1412,7 +1410,7 @@ class FMC:
 
 
 
-    def EstimateSideWall(self,ScanIndex,SWRange = (34.,45.),dl=0.5):
+    def EstimateSideWall(self,ScanIndex,SWRange = (34.,45.),dl=0.3):
 
         # Lref = len(self.Reference)
 
@@ -1577,7 +1575,7 @@ class FMC:
 
 
 
-    def DirectDelayImage(self,pth,Y,X='sidewall',elements=(range(10),range(10)),vflrng=(5,8,4),hflrng=(3,8,5),stackfnct='Sum'):
+    def DirectDelayImage(self,pth,Y,X='sidewall',elements=(range(10),range(10)),vflrng=(6,8,5),hflrng=(4,6,5)):
 
 
         Img = []
@@ -1610,17 +1608,19 @@ class FMC:
 
             if X is 'sidewall':
 
-                X = array([wp['SideWallPosition']-1.,wp['SideWallPosition'],wp['SideWallPosition']+1.])
+                X = array([wp['SideWallPosition']])
 
-            I = zeros((len(Y),len(X)))
+            # I = zeros((len(Y),len(X)))
 
-            for v in vrng:
+            I = array([GetImage(iScan,v,h) for v in vrng for h in hrng if h<=v])
 
-                h = [h for h in hrng if h<v]
-
-                for hh in h:
-
-                    I += abs(GetImage(iScan,v,hh))
+            # for v in vrng:
+            #
+            #     h = [h for h in hrng if h<=v]
+            #
+            #     for hh in h:
+            #
+            #         I += abs(GetImage(iScan,v,hh))
 
             Img.append(I)
 
