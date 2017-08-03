@@ -29,7 +29,7 @@ def ImageWeld(x):
 
     F.FusionLineFocus()
 
-    pickle.dump(open('/home/jbox/Documents/MP-CustomTFM-'+x,'wb'))
+    pickle.dump(open(F.FusionLineImages,'/home/jbox/Documents/MP-CustomTFM-'+x,'wb'))
 
     return F.FusionLineImages
 
