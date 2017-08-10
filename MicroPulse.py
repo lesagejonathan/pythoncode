@@ -17,13 +17,32 @@ def BytesToFloat(x,depth,dB=0):
     return converter[str(depth)](x)
 
 
+def ReadExactly(sock,size):
+
+    buff = bytearray()
+
+    while len(buff) < size:
+
+        data = sock.recv(size-len(buff))
+
+        if not data:
+
+            break
+
+        buff.extend(data)
+
+    return buff
+
+
+
+
 
 class PhasedArray:
 
     def __init__(self,nelements,ip='10.10.1.2',port=1067,fsamp=25,pwidth=1/10.,bitdepth=16):
 
-        self.NumberOfElements = nelements
 
+        self.NumberOfElements = nelements
         self.IP = ip
         self.Port = port
 
@@ -145,7 +164,7 @@ class PhasedArray:
 
         self.Socket.send(('PAW 1 '+str(self.NumberOfElements)+' '+str(self.PulserSettings['PulseWidth'])+'\r').encode())
 
-        # self.Socket.send(('PAW 0 '+str(self.PulserSettings['PulseWidth'])+'\r').encode())
+#        self.Socket.send(('PAW 0 '+str(self.PulserSettings['PulseWidth'])+'\r').encode())
 
 
     def SetBitDepth(self,res):
@@ -157,7 +176,7 @@ class PhasedArray:
         self.Socket.send((bitd[str(res)][1]).encode())
 
 
-    def GetFMCData(self,NElements,gate=(0.,10.),dB=0,Voltage=200,Averages=0):
+    def GetFMCData(self,gate=(0.,10.),dB=0,Voltage=200,Averages=0):
 
         # s = socket.socket()
         # s.connect((self.IP,self.Port))
@@ -165,7 +184,7 @@ class PhasedArray:
 
         try:
 
-            self.Socket.send(('PAV 1 '+str(NElements)+' '+str(int(self.ValidPAVoltage(Voltage)))+'\r').encode())
+            self.Socket.send(('PAV 1 '+str(self.NumberOfElements)+' '+str(int(self.ValidPAVoltage(Voltage)))+'\r').encode())
             # self.Socket.send((self.PulserSettings['BitDepth'][1]).encode())
             #
             # self.Socket.send(('PSV 0 '+str(self.PulserSettings['Voltage'])+'\r').encode())
@@ -183,7 +202,7 @@ class PhasedArray:
             self.SetPRF(1.5e6/(Gate[1]-Gate[0]))
 
 
-            for tr in range(1,NElements+1):
+            for tr in range(1,self.NumberOfElements+1):
 
                 self.Socket.send(('TXF '+str(tr)+' 0 -1\r').encode())
 
@@ -192,7 +211,7 @@ class PhasedArray:
 
                 self.Socket.send(('RXF '+str(tr)+' 0 -1 0\r').encode())
 
-                for rc in range(1,NElements+1):
+                for rc in range(1,self.NumberOfElements+1):
 
                     self.Socket.send(('RXF '+str(tr)+' '+str(rc)+' 0 0\r').encode())
 
@@ -201,7 +220,7 @@ class PhasedArray:
 
 
 
-            self.Socket.send(('SWP 1 '+str(256)+' - '+str(256+NElements-1)+'\r').encode())
+            self.Socket.send(('SWP 1 '+str(256)+' - '+str(256+self.NumberOfElements-1)+'\r').encode())
 
 
             self.Socket.send(('GANS 1 '+str(int(self.ValidGain(dB)))+'\r').encode())
@@ -227,14 +246,16 @@ class PhasedArray:
 
 
 
-            o = zeros((NElements,NElements,scnlngth))
+            o = zeros((self.NumberOfElements,self.NumberOfElements,scnlngth))
 
 
-            for tr in range(NElements):
+            for tr in range(self.NumberOfElements):
 
-                for rc in range(NElements):
+                for rc in range(self.NumberOfElements):
 
-                    m = self.Socket.recv(mlngth+8,socket.MSG_WAITALL)
+#                    m = self.Socket.recv(mlngth+8,socket.MSG_WAITALL)
+
+                    m = ReadExactly(self.Socket,mlngth+8)
 
 
                     # data = array([mm for mm in m[8::]])
@@ -256,19 +277,18 @@ class PhasedArray:
         self.AScans = []
 
 
-    def SaveScan(self,flname,reverse=False):
+    def SaveScan(self,flname,Reversed=False):
 
         out = self.PulserSettings.copy()
 
-        if reverse:
+        if Reversed:
 
             out['AScans'] = self.AScans[::-1]
 
         else:
 
             out['AScans'] = self.AScans
-
-
+            
 
         pickle.dump(out,open(flname,'wb'))
 

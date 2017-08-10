@@ -14,11 +14,11 @@ class Controller:
 
         self.AxisKeys = {'X':'A','Y':'B','Z':'C','Rotation':'D'}
 
-        for k in list(self.AxisKeys()):
+        for k in list(self.AxisKeys.keys()):
 
-            self.ZeroEncoder[k]
+            self.ZeroEncoder(k)
 
-        self.StepsPerMeasure = {'X':1000.,'Y':1000.,'Z':1000.,'Rotation':160.*1000./360.}
+        self.StepsPerMeasure = {'X':1000.,'Y':801.721016,'Z':1000.,'Rotation':160.*1000./360.}
 
 
     def MoveRelative(self,Axis,Position,Speed):
@@ -32,7 +32,7 @@ class Controller:
 
         # set Position
 
-        self.Galil.GCommand('PR'+self.AxisKeys[Axis]+'='+str(round(Position*self.StepsPerMeasure[Axis]))))
+        self.Galil.GCommand('PR'+self.AxisKeys[Axis]+'='+str(round(Position*self.StepsPerMeasure[Axis])))
 
         # execute Move
 
@@ -53,7 +53,7 @@ class Controller:
 
         # set Position
 
-        self.Galil.GCommand('PA'+self.AxisKeys[Axis]+'='+str(round(Position*self.StepsPerMeasure[Axis]))))
+        self.Galil.GCommand('PA'+self.AxisKeys[Axis]+'='+str(round(Position*self.StepsPerMeasure[Axis])))
 
         # execute Move
 
@@ -65,7 +65,7 @@ class Controller:
 
     def ZeroEncoder(self,Axis):
 
-        self.GalilGCommand('DP'+self.AxisKeys[Axis]+'=0')
+        self.Galil.GCommand('DP'+self.AxisKeys[Axis]+'=0')
 
         self.CurrentPosition[Axis] = 0.0
 
