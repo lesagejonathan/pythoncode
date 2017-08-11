@@ -5,14 +5,15 @@ from misc import ClosestValue
 from matplotlib.pylab import plot,show
 import pickle
 
-def BytesToFloat(x,depth,dB=0):
+def BytesToFloat(x,depth):
 
 
     converter = {}
 
-    converter['8'] = lambda x : array([xx-2**7 for xx in x]).astype(float)*(1/(2**8*10**(dB/20)))
+    converter['8'] = lambda x : array([xx-2**7 for xx in x]).astype(float)
 
-    converter['16'] = lambda x : array([x[i]+x[i+1]*256 - 2**15 for i in range(0,len(x),2)]).astype(float)*(1/(2**16*10**(dB/20)))
+    converter['16'] = lambda x : array([x[i]+x[i+1]*256 - 2**15 for i in range(0,len(x),2)]).astype(float)
+
 
     return converter[str(depth)](x)
 
@@ -288,7 +289,7 @@ class PhasedArray:
         else:
 
             out['AScans'] = self.AScans
-            
+
 
         pickle.dump(out,open(flname,'wb'))
 
