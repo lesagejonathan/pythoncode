@@ -179,98 +179,71 @@ class PhasedArray:
 
     def GetFMCData(self,gate=(0.,10.),dB=0,Voltage=200,Averages=0):
 
-        # s = socket.socket()
-        # s.connect((self.IP,self.Port))
+
+        self.Socket.send(('PAV 1 '+str(self.NumberOfElements)+' '+str(int(self.ValidPAVoltage(Voltage)))+'\r').encode())
+
+        Gate = (int(gate[0]*self.PulserSettings['SamplingFrequency']),int(gate[1]*self.PulserSettings['SamplingFrequency']))
+
+        self.SetPRF(1.5e6/(Gate[1]-Gate[0]))
 
 
-        try:
+        for tr in range(1,self.NumberOfElements+1):
 
-            self.Socket.send(('PAV 1 '+str(self.NumberOfElements)+' '+str(int(self.ValidPAVoltage(Voltage)))+'\r').encode())
-            # self.Socket.send((self.PulserSettings['BitDepth'][1]).encode())
-            #
-            # self.Socket.send(('PSV 0 '+str(self.PulserSettings['Voltage'])+'\r').encode())
-            #
-            # # self.Socketsend(('SDS '+str(self.PulserSettings['SamplingFrequency'])+'\r').encode())
-            #
-            # self.Socket.send((self.PulserSettings['SamplingFrequency'][1]).encode())
-            #
-            # self.Socket.send(('PRF '+str(self.PulserSettings['PRF'])+'\r').encode())
-            #
-            # self.Socket.send(('PAW 0 '+str(self.PulserSettings['PulseWidth'])+'\r').encode())
+            self.Socket.send(('TXF '+str(tr)+' 0 -1\r').encode())
 
-            Gate = (int(gate[0]*self.PulserSettings['SamplingFrequency']),int(gate[1]*self.PulserSettings['SamplingFrequency']))
+            self.Socket.send(('TXF '+str(tr)+' '+str(tr)+' 0\r').encode())
+            self.Socket.send(('TXN '+str(tr+256-1)+' '+str(tr)+'\r').encode())
 
-            self.SetPRF(1.5e6/(Gate[1]-Gate[0]))
+            self.Socket.send(('RXF '+str(tr)+' 0 -1 0\r').encode())
 
+            for rc in range(1,self.NumberOfElements+1):
 
-            for tr in range(1,self.NumberOfElements+1):
+                self.Socket.send(('RXF '+str(tr)+' '+str(rc)+' 0 0\r').encode())
 
-                self.Socket.send(('TXF '+str(tr)+' 0 -1\r').encode())
-
-                self.Socket.send(('TXF '+str(tr)+' '+str(tr)+' 0\r').encode())
-                self.Socket.send(('TXN '+str(tr+256-1)+' '+str(tr)+'\r').encode())
-
-                self.Socket.send(('RXF '+str(tr)+' 0 -1 0\r').encode())
-
-                for rc in range(1,self.NumberOfElements+1):
-
-                    self.Socket.send(('RXF '+str(tr)+' '+str(rc)+' 0 0\r').encode())
-
-                self.Socket.send(('RXN '+str(tr+256-1)+' '+str(tr)+'\r').encode())
+            self.Socket.send(('RXN '+str(tr+256-1)+' '+str(tr)+'\r').encode())
 
 
 
 
-            self.Socket.send(('SWP 1 '+str(256)+' - '+str(256+self.NumberOfElements-1)+'\r').encode())
+        self.Socket.send(('SWP 1 '+str(256)+' - '+str(256+self.NumberOfElements-1)+'\r').encode())
 
 
-            self.Socket.send(('GANS 1 '+str(int(self.ValidGain(dB)))+'\r').encode())
-            self.Socket.send(('GATS 1 '+str(Gate[0])+' '+str(Gate[1])+'\r').encode())
-            self.Socket.send(('AMPS 1 13 '+str(int(self.ValidAverage(Averages)))+' 0\r').encode())
-            # self.Socketsend(('AMPS 1 13\r').encode())
+        self.Socket.send(('GANS 1 '+str(int(self.ValidGain(dB)))+'\r').encode())
+        self.Socket.send(('GATS 1 '+str(Gate[0])+' '+str(Gate[1])+'\r').encode())
+        self.Socket.send(('AMPS 1 13 '+str(int(self.ValidAverage(Averages)))+' 0\r').encode())
 
-            self.Socket.send(('AWFS 1 1\r').encode())
+        self.Socket.send(('AWFS 1 1\r').encode())
 
-            self.Socket.send(('CALS 1\r').encode())
+        self.Socket.send(('CALS 1\r').encode())
 
-            scnlngth = Gate[1] - Gate[0]
-
-
-            if self.PulserSettings['BitDepth']==16:
+        scnlngth = Gate[1] - Gate[0]
 
 
-                mlngth = 2*scnlngth
-
-            elif self.PulserSettings['BitDepth']==8:
-
-                mlngth = scnlngth
+        if self.PulserSettings['BitDepth']==16:
 
 
+            mlngth = 2*scnlngth
 
-            o = zeros((self.NumberOfElements,self.NumberOfElements,scnlngth))
+        elif self.PulserSettings['BitDepth']==8:
+
+            mlngth = scnlngth
 
 
-            for tr in range(self.NumberOfElements):
 
-                for rc in range(self.NumberOfElements):
+        o = zeros((self.NumberOfElements,self.NumberOfElements,scnlngth))
+
+
+        for tr in range(self.NumberOfElements):
+
+            for rc in range(self.NumberOfElements):
 
 #                    m = self.Socket.recv(mlngth+8,socket.MSG_WAITALL)
 
-                    m = ReadExactly(self.Socket,mlngth+8)
+                m = ReadExactly(self.Socket,mlngth+8)
 
+                o[tr,rc,:] = BytesToFloat(m[8::],self.PulserSettings['BitDepth'],dB)
 
-                    # data = array([mm for mm in m[8::]])
-
-                    o[tr,rc,:] = BytesToFloat(m[8::],self.PulserSettings['BitDepth'],dB)
-
-            self.AScans.append(o)
-
-
-        except Exception as e:
-
-            print(e.message)
-
-            # self.Socketclose()
+        self.AScans.append(o)
 
 
     def ClearAScans(self):
