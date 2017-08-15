@@ -3,7 +3,7 @@ import pickle
 from numpy import *
 
 
-a = pickle.load(open('/mnt/d/FMCScans/L-FBH-CapScans/10L-32-A1/LA1.p','rb'))
+a = pickle.load(open('/mnt/d/FMCScans/L-FBH-CapScans/10L-32-A1/LD1.p','rb'))
 
 d = pickle.load(open('/mnt/d/FMCScans/ReferenceScans/MP-10L32-A1-Delays.p','rb'))
 
@@ -21,4 +21,4 @@ for i in range(len(F.AScans)):
 
     I.append(abs(F.ApplyTFM(i)))
 
-pickle.dump(I,open('/mnt/d/FMCScans/L-FBH-CapScans/10L-32-A1/CapImages-LA.p','rb'))
+pickle.dump(I,open('/mnt/d/FMCScans/L-FBH-CapScans/10L-32-A1/CapImages-LD.p','rb'))
