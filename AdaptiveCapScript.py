@@ -21,4 +21,4 @@ for i in range(len(F.AScans)):
 
     I.append(abs(F.ApplyTFM(i)))
 
-pickle.dump(I,open('/mnt/d/FMCScans/L-FBH-CapScans/10L-32-A1/CapImages-Stepped.p','rb'))
+pickle.dump(I,open('/mnt/d/FMCScans/L-FBH-CapScans/10L-32-A1/CapImages-LA.p','rb'))
