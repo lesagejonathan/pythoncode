@@ -1,5 +1,6 @@
 import FMC
 import pickle
+from numpy import *
 
 
 a = pickle.load(open('/mnt/d/FMCScans/L-FBH-CapScans/10L-32-A1/Stepped1.p','rb'))
