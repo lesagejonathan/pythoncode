@@ -1,9 +1,12 @@
 import FMC
 import pickle
 from numpy import *
+import sys
+
+fl = sys.argv[1]
 
 
-a = pickle.load(open('/mnt/d/FMCScans/L-FBH-CapScans/10L-32-A1/LD1.p','rb'))
+a = pickle.load(open('/mnt/d/FMCScans/L-FBH-CapScans/10L-32-A1/'+fl+'.p','rb'))
 
 d = pickle.load(open('/mnt/d/FMCScans/ReferenceScans/MP-10L32-A1-Delays.p','rb'))
 
@@ -21,4 +24,4 @@ for i in range(len(F.AScans)):
 
     I.append(abs(F.ApplyTFM(i)))
 
-pickle.dump(I,open('/mnt/d/FMCScans/L-FBH-CapScans/10L-32-A1/CapImages-LD.p','wb'))
+pickle.dump(I,open('/mnt/d/FMCScans/L-FBH-CapScans/10L-32-A1/OverCapImages-'+fl+'.p','wb'))

@@ -277,6 +277,8 @@ class LinearCapture:
         IX = len(self.Delays[0])
         IY = len(self.Delays[0][0])
 
+        L = self.AScans[ScanIndex].shape[2]
+
         # delaytype = (len(self.Delays) == len(self.AScans))
 
         def PointFocus(ix,iy,A):
@@ -291,7 +293,7 @@ class LinearCapture:
 
             # return reduce(lambda x,y: x+y, (A[m,n,int(round((self.Delays[m][ix][iy] + self.Delays[n][ix][iy] + self.ProbeDelays[m,n])*self.SamplingFrequency))] if ((type(self.Delays[n][ix][iy]) is float or float64) and type(self.Delays[m][ix][iy]) is float or float64) else 0.+0j for n in range(Nd) for m in range(Nd)))
 
-            return reduce(lambda x,y: x+y, (A[m,n,int(round((self.Delays[m][ix][iy] + self.Delays[n][ix][iy] + self.ProbeDelays[m,n])*self.SamplingFrequency))] if (isfinite(self.Delays[m][ix][iy]) and (isfinite(self.Delays[n][ix][iy]))) else 0.+0j for n in range(Nd) for m in range(Nd)))
+            return reduce(lambda x,y: x+y, (A[m,n,int(round((self.Delays[m][ix][iy] + self.Delays[n][ix][iy] + self.ProbeDelays[m,n])*self.SamplingFrequency))] if ( isfinite(self.Delays[m][ix][iy]) and isfinite(self.Delays[n][ix][iy]) and  int(round((self.Delays[m][ix][iy] + self.Delays[n][ix][iy] + self.ProbeDelays[m,n])*self.SamplingFrequency)) <= L) else 0.+0j for n in range(Nd) for m in range(Nd)))
 
 
         return array([PointFocus(ix,iy,self.AScans[ScanIndex]) for ix in range(IX) for iy in range(IY)]).reshape((IX,IY)).transpose()
