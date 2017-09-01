@@ -79,7 +79,7 @@ class PhasedArray:
 
         fs = int(ClosestValue(fset,fs))
 
-        self.PulserSettings['SamplingFrequency'] = fs
+        self.PulserSettings['SamplingFrequency'] = int(fs)
 
         self.Socket.send(('SRST '+str(fs)+'\r').encode())
 
@@ -241,7 +241,7 @@ class PhasedArray:
 
                 m = ReadExactly(self.Socket,mlngth+8)
 
-                o[tr,rc,:] = BytesToFloat(m[8::],self.PulserSettings['BitDepth'],dB)
+                o[tr,rc,:] = BytesToFloat(m[8::],self.PulserSettings['BitDepth'])
 
         self.AScans.append(o)
 
