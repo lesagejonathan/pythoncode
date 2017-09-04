@@ -26,8 +26,8 @@ for i in range(len(F.AScans)):
 
     h = F.FitInterfaceLine(i,(-30.,0.,0.5),(5.,15.),cw)
 
-    F.GetAdaptiveDelays(i, linspace(0,16*0.6,150), linspace(h(0),h(0)+9.6,150), h, cw, 3.24, AsParallel=True)
+    F.GetAdaptiveDelays(linspace(0,16*0.6,100), linspace(h(0),h(0)+9.6,100), h, cw, 3.24)
 
-    I.append(abs(F.ApplyTFM(i,['Band',0.,30.,cw], AsParallel=True)))
+    I.append(abs(F.ApplyTFM(i,['Band',0.,30.,cw])))
 
 pickle.dump(I,open('/mnt/d/FMCScans/L-FBH-CapScans/5L-32-A11/OverCapImages-'+fl+'.p','wb'))
