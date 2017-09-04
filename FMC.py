@@ -269,9 +269,18 @@ class LinearCapture:
 
         def x0(X,Y,n):
 
+
             m = Y/(X-n*self.Pitch)
 
-            return (m*n*self.Pitch - mh*xrng[0] + h0 - Y)/(m - mh)
+            if np.isfinite(m):
+
+                return (m*n*self.Pitch - mh*xrng[0] + h0 - Y)/(m - mh)
+
+            else:
+
+                return X
+
+
 
         def DelayMin(n):
 
@@ -323,9 +332,9 @@ class LinearCapture:
 
         alpha = ((2.35482)**2) / (2 * FWHM**2)
 
-        FilterFunction = {'Band': np.exp(-alpha * (th - angle)**2), 'Notch': 1 - np.exp(-alpha * (th - angle)**2)}
+        FilterFunction = {'Band': np.exp(-alpha * (th - angle)**2), 'Notch': 1. - np.exp(-alpha * (th - angle)**2)}
 
-        H = np.nan_to_num(FilterFunction[filtertype])
+        H = np.nan_to_num(FilterFunction[filtertype]).astype(type(X[0,0,0]))
 
         X = H * X
 
