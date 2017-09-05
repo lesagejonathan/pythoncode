@@ -4,6 +4,7 @@ from numpy import *
 import sys
 from scipy.misc import imrotate
 import multiprocessing
+from numpy import abs as Abs
 
 def AdaptiveImage(x):
 
@@ -20,11 +21,11 @@ def AdaptiveImage(x):
 
     Is = []
 
-    H = []
-
-    Dc = []
-
-    Ds = []
+    # H = []
+    #
+    # Dc = []
+    #
+    # Ds = []
 
     for i in range(len(F.AScans)):
 
@@ -32,19 +33,22 @@ def AdaptiveImage(x):
 
         F.GetAdaptiveDelays(linspace(0,16*0.6,100), linspace(h(0),h(0)+9.6,100), h, cw, 3.24)
 
-        Is.append(abs(F.ApplyTFM(i,['Band',0.,10.,cw])))
+        Is.append(imrotate(Abs(F.ApplyTFM(i,['Band',0.,10.,cw])),55.))
 
-        Ds.append(F.Delays)
+        # Ds.append(F.Delays)
 
         F.GetAdaptiveDelays(linspace(0,16*0.6,100), linspace(h(0),h(0)+9.6,100), h, cw, 5.92)
 
-        Dc.append(F.Delays)
+        # Dc.append(F.Delays)
 
-        Ic.append(abs(F.ApplyTFM(i,['Band',-10.,10.,cw])))
+        Ic.append(imrotate(Abs(F.ApplyTFM(i,['Band',-10.,10.,cw])),55.))
 
-        H.append(h)
+        # H.append(h)
 
-    pickle.dump({'ShearImages':Is, 'CompressionImages':Ic, 'Heights':H, 'ShearDelays': Ds, 'CompressionDelays': Dc, 'Resolution':0.096},open('/mnt/d/FMCScans/L-FBH-CapScans/5L-32-A11/OverCapImages-'+x+'.p','wb'))
+    # pickle.dump({'ShearImages':Is, 'CompressionImages':Ic, 'Heights':H, 'ShearDelays': Ds, 'CompressionDelays': Dc, 'Resolution':0.096},open('/mnt/d/FMCScans/L-FBH-CapScans/5L-32-A11/OverCapImages-'+x+'.p','wb'))
+
+    pickle.dump({'ShearImages':Is, 'CompressionImages':Ic, 'Resolution':0.096},open('/mnt/d/FMCScans/L-FBH-CapScans/5L-32-A11/OverCapImages-'+x+'.p','wb'))
+
 
     return 0
 
