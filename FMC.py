@@ -6,9 +6,37 @@ from pathos.multiprocessing import ProcessingPool
 def NextPow2(x):
     return int(2**int(np.ceil(np.log2(x))))
 
+# def EstimateProbeDelays(Scans,fsamp,p,h,c=5.92):
+#
+#     M = Scans.shape[0]
+#     N = Scans.shape[1]
+#
+#     x = np.abs(hilbert(Scans,axis=2))
+#
+#     W = int(np.round(fsamp*0.25*h/c))
+#
+#     Delays = np.zeros((M,N))
+#
+#     Amps = np.zeros((M,N))
+#
+#     for m in range(M):
+#
+#         for n in range(N):
+#
+#             T = int(np.round(fsamp*(2*np.sqrt((0.5*(n-m)*p)**2 + h**2)/c)))
+#
+#             indmax = np.argmax(np.abs(x[m,n,T-W:T+W]))+T-W - T
+#
+#             Amps[m,n] = np.abs(x[m,n,indmax])
+#
+#             Delays[m,n] = indmax/fsamp
+#
+#     return Delays,Amps
+
+
 class LinearCapture:
 
-    def __init__(self, fs, scans, p, N, probedelays=None):
+    def __init__(self, fs, scans, p, N, probedelays=None, elementamps = None):
 
         import copy
 
@@ -24,6 +52,14 @@ class LinearCapture:
         else:
 
             self.ProbeDelays = probedelays
+
+        if elementamps is None:
+
+            self.ElementAmplitudes = np.ones((N, N))
+
+        else:
+
+            self.ElementAmplitudes = elementamps
 
         self.AScans = copy.deepcopy(scans)
 
@@ -47,27 +83,7 @@ class LinearCapture:
 
         D = np.exp(2j*np.pi*np.repeat(self.ProbeDelays[:,:,np.newaxis],f.shape[2],2)*f)
 
-        # print(D.shape)
-
-        # Nd = (np.round(self.ProbeDelays*self.SamplingFrequency)).astype(int)
-        #
-        # for i in range(len(self.AScans)):
-        #
-        #     self.AScans[i] = self.AScans[i].astype(np.complex)
-        #
-        #     if zeropoints != 0:
-        #         self.AScans[i][:,:,0:zeropoints] = 0.0 + 0j
-        #
-        #     for m in range(self.NumberOfElements):
-        #
-        #         for n in range(self.NumberOfElements):
-        #
-        #
-        #
-        #             self.AScans[i][m,n,:] = np.concatenate((hilbert(detrend(np.real(self.AScans[i][m,n,:]),
-        #                                     bp=tuple(range(0, L + int(L / bp), int(L / bp)))))[Nd[m,n]::],np.zeros(Nd[m,n],dtype=np.complex128)))
-
-
+        A = np.repeat(self.ElementAmplitudes[:,:,np.newaxis], f.shape[2], 2).astype(np.complex64)
 
         for i in range(len(self.AScans)):
 
@@ -80,7 +96,7 @@ class LinearCapture:
 
             self.AScans[i] = self.AScans[i].astype(np.complex64)
 
-            self.AScans[i] = 2*ifft(X*D,n=Lpad)[:,:,0:L]
+            self.AScans[i] = 2*ifft((X/A)*D,n=Lpad)[:,:,0:L]
 
 
     def PlaneWaveSweep(self, ScanIndex, Angles, c):
@@ -194,24 +210,51 @@ class LinearCapture:
 
         self.NumberOfElements = len(Elements)
 
-    def FitInterfaceCurve(self, ScanIndex, hrng, c):
+    def FitInterfaceCurve(self, ScanIndex, hrng, c, smoothparams=(0.1,0.1)):
 
         from scipy.interpolate import interp1d
-        from skimage.filters import gaussian
+        # from scipy.signal import guassian, convolve
+        from skimage.filters import threshold_li, gaussian
+        from misc import DiffCentral
 
         xrng = np.linspace(0, self.NumberOfElements*self.Pitch, self.NumberOfElements)
 
         self.GetContactDelays(xrng, hrng, c)
 
-        I = self.ApplyTFM(ScanIndex)
+        I = gaussian(np.abs(self.ApplyTFM(ScanIndex)),smoothparams)
 
         dh = hrng[1] - hrng[0]
 
-        hgrid = hrng[0] + dh*np.argmax(gaussian(np.abs(I),1.), axis = 0)
+        hgrid = hrng[0] + dh*np.argmax(I, axis = 0)
 
-        hcurve = interp1d(xrng, hgrid)
+        dhdx = np.abs(DiffCentral(hgrid))
 
-        return hgrid, hcurve
+        indkeep = np.where(dhdx<threshold_li(dhdx))
+
+        hgrid = hgrid[indkeep]
+
+        xrng = xrng[indkeep]
+
+
+        # hgrid = np.zeros((options['NPeaks'], I.shape[1]))
+        #
+        # for i in range(I.shape[0]):
+        #
+        #     indmax,valmax = argrelmax(np.abs(I[:,i]), order=options['MinSpacing'])
+        #
+        #     indmax = indmax[np.argsort(valmax)[-options['NPeaks']::]]
+        #
+        #     hgrid[:,i] = hrng[0] + dh*indmax
+
+
+        h = interp1d(xrng, hgrid, kind='quadratic', bounds_error=False, fill_value=np.nan)
+
+        dhdx = interp1d(xrng[1::],np.diff(h(xrng))/np.diff(xrng), bounds_error=False, fill_value=np.nan)
+
+
+        return h, dhdx
+
+        # return h
 
     def FitInterfaceLine(self, ScanIndex, angrng, gate, c):
 
@@ -235,7 +278,10 @@ class LinearCapture:
 
     def GetAdaptiveDelays(self, xrng, yrng, h, cw, cs, AsParallel=False):
 
-        from scipy.optimize import minimize
+    # def GetAdaptiveDelays(self, xrng, yrng, h, dhdx, cw, cs, AsParallel=False):
+
+
+        from scipy.optimize import minimize_scalar, brentq
         # from scipy.interpolate import interp1d
         # from skimage.filters import threshold_li
 
@@ -258,35 +304,51 @@ class LinearCapture:
         def f(x, X, Y, n):
             return np.sqrt((x - n * self.Pitch)**2 + h(x) ** 2) / cw + np.sqrt((X - x)**2 + (Y - h(x))**2) / cs
 
+
+        def dfdx(x ,X, Y, n):
+            return ((x-n*self.Pitch + h(x))**(-1/2.))*(x-n*self.Pitch + h(x)*dhdx(x))/cw - (((X-x)**2 + (Y-h(x))**2)**(-1/2.))*((X-x)**2 + (Y-h(x))*dhdx(x))/cs
+
         # hmin = np.min(hgrid[hgrid>hthresh])
         #
         # yrng = np.linspace(hmin,hmin+depth[0],int(round(depth[0]/depth[1])))
         #
         # xrng = np.linspace(0,xrng[-1],int(round(xrng[-1]/depth[1])))
 
-        h0 = h(xrng[0])
-        mh = (h(xrng[-1]) - h0)/(xrng[-1]-xrng[0])
+        # h0 = h(xrng[0])
+        # mh = (h(xrng[-1]) - h0)/(xrng[-1]-xrng[0])
+        #
+        # def x0(X,Y,n):
+        #
+        #
+        #     m = Y/(X-n*self.Pitch)
+        #
+        #     if np.isfinite(m):
+        #
+        #         return (m*n*self.Pitch - mh*xrng[0] + h0 - Y)/(m - mh)
+        #
+        #     else:
+        #
+        #         return X
+        #
 
-        def x0(X,Y,n):
 
-
-            m = Y/(X-n*self.Pitch)
-
-            if np.isfinite(m):
-
-                return (m*n*self.Pitch - mh*xrng[0] + h0 - Y)/(m - mh)
-
-            else:
-
-                return X
-
-
+        # def DelayMin(n):
+        #
+        #     return [[float(minimize(f,x0=x0(x,y,n),args=(x,y,n),method='BFGS',options={'disp': False,
+        #         'gtol': 1e-3,'eps': 1e-4,'return_all': False,'maxiter': 50, 'norm': np.inf}).fun)
+        #         if y >= h(x) else np.nan for y in yrng] for x in xrng]
 
         def DelayMin(n):
 
-            return [[float(minimize(f,x0=x0(x,y,n),args=(x,y,n),method='BFGS',options={'disp': False,
-                'gtol': 1e-3,'eps': 1e-4,'return_all': False,'maxiter': 50, 'norm': np.inf}).fun)
-                if y >= h(x) else np.nan for y in yrng] for x in xrng]
+            return [[float(minimize_scalar(f,bracket=(n*self.Pitch,x),args=(x,y,n),method='Brent',options={'xtol':1e-3,'maxiter':50}).fun)
+                    if y >= h(x) else np.nan for y in yrng] for x in xrng]
+
+        # def DelayMin(n):
+        #
+        #     return [[ float(dfdx(brentq(dfdx, n*self.Pitch,x,args=(x,y,n), maxiter=20, xtol=1e-3), x,y,n))
+        #             if y >= h(x) else np.nan for y in yrng] for x in xrng]
+
+
 
         # self.Delays =
         # [[[float(minimize(f,x0=0.5*abs(x-n*self.Pitch),args=(x,y,n),method='BFGS',options={'disp':
@@ -314,11 +376,11 @@ class LinearCapture:
         # Lpad = NextPow2(L)
 
 
-        # X = fftshift(fftn(np.real(self.AScans[ScanIndex]), s=(self.NumberOfElements,L),axes=(0, 2)), axes=(0))
+        X = fftshift(fftn(np.real(self.AScans[ScanIndex]), s=(self.NumberOfElements,L),axes=(0, 2)), axes=(0))
 
-        X = fftshift(rfft(fft(np.real(self.AScans[ScanIndex]), axis = 0)), axes = (0))
+        # X = fftshift(rfft(fft(np.real(self.AScans[ScanIndex]), axis = 0)), axes = (0))
 
-        # X = X[:, :, 0:int(np.floor(X.shape[2] / 2) + 1)]
+        X = X[:, :, 0:int(np.floor(X.shape[2] / 2) + 1)]
 
         kx = 2 * np.pi * np.linspace(-1 / (2 * self.Pitch),
                                1 / (2 * self.Pitch), X.shape[0]).reshape(-1, 1)
