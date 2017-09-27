@@ -6,37 +6,118 @@ from pathos.multiprocessing import ProcessingPool
 def NextPow2(x):
     return int(2**int(np.ceil(np.log2(x))))
 
-# def EstimateProbeDelays(Scans,fsamp,p,h,c=5.92):
-#
-#     M = Scans.shape[0]
-#     N = Scans.shape[1]
-#
-#     x = np.abs(hilbert(Scans,axis=2))
-#
-#     W = int(np.round(fsamp*0.25*h/c))
-#
-#     Delays = np.zeros((M,N))
-#
-#     Amps = np.zeros((M,N))
-#
-#     for m in range(M):
-#
-#         for n in range(N):
-#
-#             T = int(np.round(fsamp*(2*np.sqrt((0.5*(n-m)*p)**2 + h**2)/c)))
-#
-#             indmax = np.argmax(np.abs(x[m,n,T-W:T+W]))+T-W - T
-#
-#             Amps[m,n] = np.abs(x[m,n,indmax])
-#
-#             Delays[m,n] = indmax/fsamp
-#
-#     return Delays,Amps
+def RBF(x,ai,xi,beta):
 
+    return ai*np.exp(-beta*(x-xi)**2)
+
+def FitRBF(x,f,beta):
+
+    from numpy.linalg import solve
+
+    return solve(np.exp(-beta*(x.reshape(-1,1) - x.reshape(1,-1))**2),f.reshape(-1,1))
+
+
+def EstimateProbeDelays(Scans,fsamp,p,h,c=5.92):
+
+    from scipy.signal import hilbert
+
+    M = Scans.shape[0]
+    N = Scans.shape[1]
+
+    x = np.abs(hilbert(Scans,axis=2))
+
+    W = int(np.round(fsamp*0.25*h/c))
+
+    Delays = np.zeros((M,N))
+
+    A = np.zeros(M)
+
+
+    for m in range(M):
+
+        A[m] = np.sqrt(np.max(np.abs(x[m,m,W::])))
+
+        for n in range(N):
+
+            T = int(np.round(fsamp*(2*np.sqrt((0.5*(n-m)*p)**2 + h**2)/c)))
+
+            indmax = np.argmax(np.abs(x[m,n,T-W:T+W]))+T-W - T
+
+            Delays[m,n] = indmax/fsamp
+
+    return Delays, A.reshape(-1,1)*A.reshape(1,-1)
+
+def EstimateDirectivityAttenuation(Scans,positions,fsamp,pitch,c,amps,delays,thetagrid,rgrid,fcentre=5.):
+
+    from scipy.optimize import minimize
+
+    betat = 4.0*np.log(2)/(min(thetagrid)/2)**2
+    betar = 4.0*np.log(2)/(min(rgrid)/2)**2
+
+
+    N = Scans[0].shape[0]
+
+    F = LinearCapture(fsamp,Scans,pitch,N,delays,amps)
+
+    F.ProcessScans(100)
+
+    Imax = []
+
+    A = []
+
+    theta = []
+
+    r = []
+
+    for i in range(len(F.AScans)):
+
+        F.GetContactDelays(np.linspace(positions[i][0]-2.5,positions[i][0]+2.5,50), np.linspace(positions[i][1]-2.5,positions[i][1]+2.5,50), c)
+
+        I = np.abs(F.ApplyTFM(i))
+
+        indmax = np.unravel_index(np.argmax(I), I.shape)
+
+        xmax = F.xRange[indmax[1]]
+
+        ymax = F.yRange[indmax[0]]
+
+        theta.append([np.arctan2(n*pitch - xmax, ymax) for n in range(N)])
+
+        r.append([np.sqrt((xmax-n*pitch)**2 + ymax**2) for n in range(N)])
+
+        A.append(np.array([[np.abs(F[i].AScans[m,n,int(round(fsamp*r[i][m]+r[i][n]/c))]) for n in range(N) ] for m in range(N)]))
+
+        Imax.append(np.amax(I))
+
+
+    def Loss(x):
+
+        atheta = x[0:len(thetagrid)]
+        ar = x[len(thetagrid)::]
+
+        def loss(i):
+
+            return reduce(lambda x,y: x+y, ((1. - (A[i][m,n]/Imax[i])*
+                RBF(theta[i][m],atheta[t],thetagrid[t],betat)*RBF(theta[i][n],
+                atheta[t],thetagrid[t],betat)*RBF*(r[i][m],ar[r],rgrid[r],betar)*
+                RBF(r[i][n],ar[r],rgrid[r],betar))**2 for m in range(N)
+                for n in range(N) for t in range(len(atheta)) for r in range(len(ar))))
+
+        return reduce(lambda x,y: x+y, (loss(i) for i in range(len(Imax))))
+
+    a0theta = FitRBF(thetagrid,np.sinc(pitch*np.sin(thetagrid)/(fcentre/c)),betat)
+    a0r = FitRBF(rgrid,1./np.sqrt(rgrid),betar)
+
+    X = minimize(Loss, x0=list(a0theta)+list(a0r))
+
+    Directivity = lambda x: reduce(lambda x,y: x+y, [RBF(x,a,betat) for a in X[0:len(thetagrid)]])
+    Attenuation = lambda x: reduce(lambda x,y: x+y, [RBF(x,a,betar) for a in X[len(thetagrid)::]])
+
+    return Directivity, Attenuation
 
 class LinearCapture:
 
-    def __init__(self, fs, scans, p, N, probedelays=None, elementamps = None):
+    def __init__(self, fs, scans, p, N, probedelays = None, elementamps = None):
 
         import copy
 
