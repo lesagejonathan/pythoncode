@@ -45,17 +45,13 @@ def ReadExactly(sock,size):
 
     return buff
 
-def ReadBuffer(sock,buff,size):
+def ReadBuffer(sock,buff,size,stopcapture):
 
-    while True:
+    while not(stopcapture.is_set()):
 
         data = sock.recv(size)
 
-        print(len(data))
-
-        if len(data)==0:
-            break
-        else:
+        if len(data)>0:
             buff.extend(data)
 
     return
@@ -80,6 +76,7 @@ class PhasedArray:
         self.SetBitDepth(bitdepth)
 
         self.ClearScans()
+
 
 
     def SetSamplingFrequency(self,fs=25):
@@ -234,6 +231,7 @@ class PhasedArray:
 
         self.ScanLength = gate[1]-gate[0]
 
+        ReadLength = self.ScanLength*(int(self.PulserSettings['BitDepth'])/8) + 8
 
         self.SetPRF(1.5e6/(Gate[1]-Gate[0]))
 
@@ -266,6 +264,11 @@ class PhasedArray:
                                 'Averages': Averages}
 
 
+        self.StopCapture = threading.Event()
+        self.BufferThread = threading.Thread(target = ReadBuffer, args = (self.Socket, self.Buffer, ReadLength, self.StopCapture))
+        self.BufferThread.start()
+
+
     def ExecuteCapture(self, NExecutions=1, TimeBetweenCaptures = None):
 
 
@@ -286,10 +289,10 @@ class PhasedArray:
             self.ScanCount += 1
 
 
-    def ReadData(self):
+    def ReadBuffer(self):
 
         """
-            Reads data from MicroPulse buffer - currently only working
+            Reads data from the buffer - currently only working
             for FMC captures
 
             TODO:
@@ -299,40 +302,47 @@ class PhasedArray:
 
         """
 
-        # scnlngth = self.CaptureSettings['Gate'][1] - self.CaptureSettings['Gate'][0]
-        #
-        # if self.PulserSettings['BitDepth']==16:
-        #
-        #     mlngth = 2*scnlngth
-        #
-        # elif self.PulserSettings['BitDepth']==8:
-        #
-        #     mlngth = scnlngth
-
         if self.CaptureSettings['CatpureType'] == 'FMC':
 
-            for s in range(self.ScanCount):
+            Nt = self.ScanLength*(int(self.PulserSettings['BitDepth'])/8)
+            Ntr = len(self.CaptureSettings['Elements'][0])
+            Nrc = len(self.CaptureSettings['Elements'][1])
 
-                o = zeros((len(self.CaptureSettings['Elements'][0]), len(self.CaptureSettings['Elements'][1]), self.ScanLength))
+            totalscanbytes = self.ScanCount*(Nt+8)*Ntr*Nrc
 
-                for tr in range(len(self.CaptureSettings['Elements'][0])):
+            while len(self.Buffer)<totalscanbytes:
 
-                    for rc in range(len(self.CaptureSettings['Elements'][1])):
+                time.sleep(0.1)
 
-                        m = ReadExactly(self.Socket, int(self.ScanLength*int(self.PulserSettings['BitDepth'])/8) + 8)
+            self.StopCapture.set()
 
-                        o[tr,rc,:] = BytesToFloat(m[8::], self.PulserSettings['BitDepth'])
+            indstart = 0
+            indstop = 0
 
-                self.AScans.append(o)
+            for s in self.ScanCount:
 
-                self.ScanCount -= 1
+                A = zeros((Ntr, Nrc, self.ScanLength))
+
+                for tr in Ntr:
+                    for rc in Nrc:
+
+                        indstart = s*Ntr*Nrc*Nt+tr*Nrc*Nt+rc*Nt+8
+                        indstop = indstart + Nt + 1
+
+                        A[tr,rc,:] = BytesToFloat(self.Buffer[indstart:indstop],'16')
+
+                self.AScans.append(A)
+
+            self.ScanCount = 0
+            self.Buffer = bytearray()
 
     def ClearScans(self):
 
         """
 
             Removes all scans stored in AScans, zeros ScanCount and stops
-            all UT tests in progress + clears MicroPulse data buffer
+            all UT tests in progress + clears MicroPulse data buffer and
+            local Buffer variable
 
         """
 
@@ -340,6 +350,8 @@ class PhasedArray:
         self.ScanCount = 0
 
         self.Socket.send(('STX 1\r').encode())
+
+        self.Buffer = bytearray()
 
 
     def SaveScans(self,Filename, ScanInfo = None, Reversed=False):
