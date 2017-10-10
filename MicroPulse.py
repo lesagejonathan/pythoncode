@@ -58,9 +58,9 @@ def ReadBuffer(sock,buff,size,stopcapture):
 
 
 
-class PhasedArray:
+class PeakNDT:
 
-    def __init__(self,ip='10.10.1.2',port=1067,fsamp=25,pwidth=1/10.,bitdepth=16):
+    def __init__(self,ip='10.10.1.2',port=1067, fsamp=25, bitdepth=16):
 
 
         self.IP = ip
@@ -71,8 +71,6 @@ class PhasedArray:
 
         self.PulserSettings = {}
         self.SetSamplingFrequency(fsamp)
-
-        self.SetPulseWidth(pwidth)
         self.SetBitDepth(bitdepth)
 
         self.ClearScans()
@@ -107,17 +105,24 @@ class PhasedArray:
 
     def ValidGain(self,dB):
 
+        """
+
+            Takes (float) dB and returns closest valid Gain setting
+            if illegal gain setting is specified, it is corrected to 24
+
+        """
+
         gain = int(dB/0.25)
 
         if gain<0:
 
             Gain = 0
 
-        elif 0<=gain<=80:
+        elif 0<=gain<=70:
 
             Gain = gain
 
-        elif gain>80:
+        elif gain>70:
 
             Gain = 80
 
@@ -127,11 +132,18 @@ class PhasedArray:
 
         return Gain
 
-    def ValidPAVoltage(self,voltage):
+    def ValidPAVoltage(self, voltage):
 
         vset = list(range(50,205,5))
 
-        return int(ClosestValue(vset,voltage))
+        return int(ClosestValue(vset, voltage))
+
+    def ValidConventionalVoltage(self, voltage):
+
+        vset = [50, 100, 150, 200, 250, 300]
+
+        return int(ClosestValue(vset, voltage))
+
 
     def ValidAverage(self,naverages):
 
@@ -153,21 +165,62 @@ class PhasedArray:
 
         return Averages
 
-    def SetPulseWidth(self,width):
+    # def SetPAPulseWidth(self,width):
+    #
+    #     """
+    #
+    #         Sets pulse widths on all phased array channels to value specified
+    #         by argument width (or closest valid value)
+    #         to floating point in nanoseconds
+    #
+    #     """
+    #
+    #     wdthset = list(range(20,502,2))
+    #
+    #     self.PulserSettings['PulseWidth'] = int(ClosestValue(wdthset,width*1e3))
+    #
+    #     self.Socket.send(('PAW 1 128 '+str(self.PulserSettings['PulseWidth'])+'\r').encode())
+
+    def ValidPAPulseWidth(self,width):
 
         """
-
-            Sets pulse widths on all phased array channels to value specified
-            by argument width (or closest valid value), floating point in
-            nanoseconds
+            Gets closest valid pulse width for phased array channels to
+            value specified in (float) width in microseconds, returns value
+            in nanoseconds
 
         """
 
         wdthset = list(range(20,502,2))
 
-        self.PulserSettings['PulseWidth'] = int(ClosestValue(wdthset,width*1e3))
+        return int(ClosestValue(wdthset,width*1e3))
 
-        self.Socket.send(('PAW 1 128 '+str(self.PulserSettings['PulseWidth'])+'\r').encode())
+
+    def ValidConventionalPulseWidth(self, width):
+
+        """
+            Gets closest valid pulse width for conventional channels to
+            value specified in (float) width in microseconds, returns value
+            in nanoseconds
+        """
+
+        wdthset = list(range(16,1012,2))
+
+        return int(ClosestValue(wdthset,width*1e3))
+
+
+    def ValidConventionalDamping(self, damping):
+
+        """
+            Gets valid setting for (float) damping specified in ohms,
+            returns integer value for closest setting
+
+        """
+
+        dampsetting = list(range(8))
+
+        dampvalue = [660, 458, 220, 149, 102, 82, 63, 51]
+
+        return dampsetting[ClosestIndex(dampvalue,damping)]
 
     def SetBitDepth(self,res):
 
@@ -189,7 +242,87 @@ class PhasedArray:
 
         self.Socket.send((bitd[str(res)][1]).encode())
 
-    def SetFMCCapture(self, Elements, Gate, Voltage=100., Gain=20., Averages=0):
+
+    def SetConventionalCapture(self, Channels, Gate, Voltage = 100., Gain = 20., Averages = 0 , PulseWidth = 1/10., Damping = 660.):
+
+        """ Sets Conventional UT Capture to be executed
+
+        Channels  - Tuple (transmitting conventional channel, recieving conventional channel)
+
+        Gate - Tuple defining the start and end of the time gate to be recorded
+               in microseconds
+
+        Voltage - Float value defining desired element voltage to be applied
+                  to the transmitting elements (in Volts, adjusted to closest
+                  allowed value)
+
+        Gain - Float value defining desired reciever gain to be applied to
+                recieve elements (in dB, adjusted to closest allowed value)
+
+        Averages - Integer number of of averages to be taken for the capture
+                    (adjusted to closest allowed value)
+
+        PulseWidth - Floating point number specifying the pulse width in
+                    microseconds (adjusted to closest allowed value)
+
+        Damping - Floating point number specifying the channel damping in ohms
+                    (adjusted to closest allowed setting)
+
+        Todo:
+
+            * Allow multiple channels to be transmitted and received
+             simultaneously (if possible)
+            * Allow test number to be appended so that more complicated
+              sequences can be handled
+
+        """
+
+        self.Socket.send(('STX 1\r').encode())
+
+
+        # Currently only setting channel damping and pulse widths to the same value
+
+        self.Socket.send(('PDW 0 '+str(self.ValidConventionalDamping(Damping))+' '+str(self.ValidConventionalPulseWidth(PulseWidth))+'\r').encode())
+
+        self.Socket.send(('PSV '+str(Channels[0])+' '+str(int(self.ValidConventionalVoltage(Voltage)))+'\r').encode())
+
+        gate = (int(Gate[0]*self.PulserSettings['SamplingFrequency']),int(Gate[1]*self.PulserSettings['SamplingFrequency']))
+
+        self.ScanLength = gate[1]-gate[0]
+
+        ReadLength = self.ScanLength*(int(self.PulserSettings['BitDepth'])/8) + 8
+
+        self.SetPRF(1.5e6/(Gate[1]-Gate[0]))
+
+        self.Socket.send(('NUM 1\r').encode())
+
+        self.Socket.send(('TXN 1 '+str(Channels[0])+'\r').encode())
+
+        self.Socket.send(('RXN 1 '+str(Channels[1])+'\r').encode())
+
+        self.Socket.send(('GAN 1 '+str(self.ValidGain(Gain))+'\r').encode())
+
+        self.Socket.send(('GAT 1 '+str(gate[0])+' '+str(gate[1])+'\r').encode())
+
+        self.Socket.send(('AWF 1 1\r').encode())
+
+        self.Socket.send(('AMP 1 3 0 '+str(self.ValidAverage(Averages))+'\r').encode())
+
+        self.Socket.send(('DLY 1 0\r').encode())
+
+        self.Socket.send(('ETM 1 0\r').encode())
+
+        self.CaptureSettings = {'CatpureType': 'Conventional', 'Channels': Channels,
+                                'Gate':Gate,'Voltage': Voltage, 'Gain': Gain,
+                                'Averages': Averages, 'PulseWidth': PulseWidth, 'Damping': Damping}
+
+
+        self.StopCapture = threading.Event()
+        self.BufferThread = threading.Thread(target = ReadBuffer, args = (self.Socket, self.Buffer, ReadLength, self.StopCapture))
+        self.BufferThread.start()
+
+
+    def SetFMCCapture(self, Elements, Gate, Voltage=100., Gain=20., Averages=0, PulseWidth = 1/10.):
 
         """ Sets FMC Type Capture to be executed
 
@@ -208,7 +341,11 @@ class PhasedArray:
                 recieve elements (in dB, adjusted to closest allowed value)
 
         Averages - Integer number of of averages to be taken for the capture
-                    (adjested to closest allowed value)
+                    (adjusted to closest allowed value)
+
+        PulseWidth - Floating point number defining pulse width for the capture
+                    (adjusted to the closest allowed value)
+
 
         Todo:
 
@@ -225,7 +362,9 @@ class PhasedArray:
             Elements = (range(1,Elements+1), range(1,Elements+1))
 
 
-        self.Socket.send(('PAV 1 '+str(len(Elements[0]))+' '+str(int(self.ValidPAVoltage(Voltage)))+'\r').encode())
+        self.Socket.send(('PAW '+str(Elements[0][0])+' '+str(Elements[0][-1])+' '+str(self.ValidPAPulseWidth(PulseWidth))+'\r').encode())
+
+        self.Socket.send(('PAV '+str(Elements[0][0])+' '+str(Elements[0][-1])+' '+str(int(self.ValidPAVoltage(Voltage)))+'\r').encode())
 
         gate = (int(Gate[0]*self.PulserSettings['SamplingFrequency']),int(Gate[1]*self.PulserSettings['SamplingFrequency']))
 
@@ -261,7 +400,7 @@ class PhasedArray:
 
         self.CaptureSettings = {'CatpureType': 'FMC', 'Elements': Elements,
                                 'Gate':Gate,'Voltage': Voltage, 'Gain': Gain,
-                                'Averages': Averages}
+                                'Averages': Averages, 'PulseWidth':PulseWidth}
 
 
         self.StopCapture = threading.Event()
@@ -280,7 +419,13 @@ class PhasedArray:
 
         for n in range(NExecutions):
 
-            self.Socket.send(('CALS 1\r').encode())
+            if self.CaptureSettings['CaptureType']=='Conventional':
+
+                self.Socket.send(('CAL 0\r').encode())
+
+            else:
+
+                self.Socket.send(('CALS 0\r').encode())
 
             if TimeBetweenCaptures is not None:
 
@@ -293,14 +438,17 @@ class PhasedArray:
 
         """
             Reads data from the buffer - currently only working
-            for FMC captures
+            for FMC and Conventional captures
 
             TODO:
 
             * Add functionality to read scans from buffer and store them for
-              sectorial scans, electronic scans, etc.
+              sectorial scans, electronic scans, conventional tests, etc.
 
         """
+
+        Nt = self.ScanLength*(int(self.PulserSettings['BitDepth'])/8)
+
 
         if self.CaptureSettings['CatpureType'] == 'FMC':
 
@@ -329,9 +477,32 @@ class PhasedArray:
                         indstart = s*Ntr*Nrc*Nt+tr*Nrc*Nt+rc*Nt+8
                         indstop = indstart + Nt + 1
 
-                        A[tr,rc,:] = BytesToFloat(self.Buffer[indstart:indstop],'16')
+                        A[tr,rc,:] = BytesToFloat(self.Buffer[indstart:indstop], self.PulserSettings['BitDepth'])
 
                 self.AScans.append(A)
+
+
+        elif self.CaptureSettings['CatpureType'] == 'Conventional':
+
+
+            totalscanbytes = self.ScanCount*(Nt+8)
+
+            while len(self.Buffer)<totalscanbytes:
+
+                time.sleep(0.1)
+
+            self.StopCapture.set()
+
+            indstart = 0
+            indstop = 0
+
+            for s in self.ScanCount:
+
+
+                indstart = s*Nt+8
+                indstop = indstart + Nt + 1
+
+                self.AScans.append(BytesToFloat(self.Buffer[indstart:indstop],self.PulserSettings['BitDepth']))
 
             self.ScanCount = 0
             self.Buffer = bytearray()
@@ -394,21 +565,23 @@ class PhasedArray:
 
 # class Conventional:
 #
-#     def __init__(self, ip = '10.10.1.2', port = 1067, fsamp = 25, pwidth = 1/5., bitdepth = 16., voltage = 200.):
+#     def __init__(self,ip='10.10.1.2',port=1067,fsamp=25,pwidth=1/10.,bitdepth=16):
 #
-#         self.IP =  ip
+#
+#         self.IP = ip
 #         self.Port = port
 #
 #         self.Socket = socket.socket()
-#         self.Socket.connect((self.IP,self.Port))
+#         self.Socket.connect((ip,port))
 #
 #         self.PulserSettings = {}
 #         self.SetSamplingFrequency(fsamp)
+#
 #         self.SetPulseWidth(pwidth)
 #         self.SetBitDepth(bitdepth)
-#         self.SetVoltage(voltage)
 #
-#         self.AScan = []
+#         self.ClearScans()
+#
 #
 #     def SetSamplingFrequency(self, fs = 25.):
 #
@@ -420,7 +593,9 @@ class PhasedArray:
 #
 #         self.Socket.send(('SRST ' + str(fs) + '\r').encode())
 #
-#     def ValidatePRF(self,prf):
+#
+#
+#     def SetPRF(self,prf):
 #
 #         if prf<1:
 #             PRF = 1
@@ -433,7 +608,9 @@ class PhasedArray:
 #         else:
 #             PRF = 1000
 #
-#         return PRF
+#         self.PulserSettings['PRF'] = PRF
+#         self.Socket.send(('PRF '+str(PRF)+'\r').encode())
+#
 #
 #     def SetPulsewidth(self, pw = 1/5.):
 #
@@ -548,87 +725,87 @@ class PhasedArray:
 #
 #
 #
+
+
+
+#     def GetFMCData(self,gate=(0.,10.),dB=0,Voltage=200,Averages=0):
+#
+#         self.Socket.send(('PAV 1 '+str(self.NumberOfElements)+' '+str(int(self.ValidPAVoltage(Voltage)))+'\r').encode())
+#
+#         Gate = (int(gate[0]*self.PulserSettings['SamplingFrequency']),int(gate[1]*self.PulserSettings['SamplingFrequency']))
+#
+#         self.SetPRF(1.5e6/(Gate[1]-Gate[0]))
+#
+#         for tr in range(1,self.NumberOfElements+1):
+#
+#             self.Socket.send(('TXF '+str(tr)+' 0 -1\r').encode())
+#
+#             self.Socket.send(('TXF '+str(tr)+' '+str(tr)+' 0\r').encode())
+#             self.Socket.send(('TXN '+str(tr+256-1)+' '+str(tr)+'\r').encode())
+#
+#             self.Socket.send(('RXF '+str(tr)+' 0 -1 0\r').encode())
+#
+#             for rc in range(1,self.NumberOfElements+1):
+#
+#                 self.Socket.send(('RXF '+str(tr)+' '+str(rc)+' 0 0\r').encode())
+#
+#             self.Socket.send(('RXN '+str(tr+256-1)+' '+str(tr)+'\r').encode())
 #
 #
+#         self.Socket.send(('SWP 1 '+str(256)+' - '+str(256+self.NumberOfElements-1)+'\r').encode())
 #
-# #     def GetFMCData(self,gate=(0.,10.),dB=0,Voltage=200,Averages=0):
-# #
-# #         self.Socket.send(('PAV 1 '+str(self.NumberOfElements)+' '+str(int(self.ValidPAVoltage(Voltage)))+'\r').encode())
-# #
-# #         Gate = (int(gate[0]*self.PulserSettings['SamplingFrequency']),int(gate[1]*self.PulserSettings['SamplingFrequency']))
-# #
-# #         self.SetPRF(1.5e6/(Gate[1]-Gate[0]))
-# #
-# #         for tr in range(1,self.NumberOfElements+1):
-# #
-# #             self.Socket.send(('TXF '+str(tr)+' 0 -1\r').encode())
-# #
-# #             self.Socket.send(('TXF '+str(tr)+' '+str(tr)+' 0\r').encode())
-# #             self.Socket.send(('TXN '+str(tr+256-1)+' '+str(tr)+'\r').encode())
-# #
-# #             self.Socket.send(('RXF '+str(tr)+' 0 -1 0\r').encode())
-# #
-# #             for rc in range(1,self.NumberOfElements+1):
-# #
-# #                 self.Socket.send(('RXF '+str(tr)+' '+str(rc)+' 0 0\r').encode())
-# #
-# #             self.Socket.send(('RXN '+str(tr+256-1)+' '+str(tr)+'\r').encode())
-# #
-# #
-# #         self.Socket.send(('SWP 1 '+str(256)+' - '+str(256+self.NumberOfElements-1)+'\r').encode())
-# #
-# #         self.Socket.send(('GANS 1 '+str(int(self.ValidGain(dB)))+'\r').encode())
-# #         self.Socket.send(('GATS 1 '+str(Gate[0])+' '+str(Gate[1])+'\r').encode())
-# #         self.Socket.send(('AMPS 1 13 '+str(int(self.ValidAverage(Averages)))+' 0\r').encode())
-# #
-# #         self.Socket.send(('AWFS 1 1\r').encode())
-# #         self.Socket.send(('CALS 1\r').encode())
-# #
-# #         scnlngth = Gate[1] - Gate[0]
-# #
-# #         if self.PulserSettings['BitDepth']==16:
-# #
-# #             mlngth = 2*scnlngth
-# #
-# #         elif self.PulserSettings['BitDepth']==8:
-# #
-# #             mlngth = scnlngth
-# #
-# #         o = zeros((self.NumberOfElements,self.NumberOfElements,scnlngth))
-# #
-# #         for tr in range(self.NumberOfElements):
-# #
-# #             for rc in range(self.NumberOfElements):
-# #
-# #                 m = ReadExactly(self.Socket,mlngth+8)
-# #
-# #                 o[tr,rc,:] = BytesToFloat(m[8::],self.PulserSettings['BitDepth'])
-# #
-# #         self.AScans.append(o)
-# #
-# #     def ClearAScans(self):
-# #
-# #         self.AScans = []
-# #
-# #     def SaveScan(self,flname,Reversed=False):
-# #
-# #         out = self.PulserSettings.copy()
-# #
-# #         if Reversed:
-# #
-# #             out['AScans'] = self.AScans[::-1]
-# #
-# #         else:
-# #
-# #             out['AScans'] = self.AScans
-# #
-# #
-# #         _pickle.dump(out,open(flname,'wb'))
-# #
-# #     def __del__(self):
-# #
-# #         self.Socket.close()
-# #
+#         self.Socket.send(('GANS 1 '+str(int(self.ValidGain(dB)))+'\r').encode())
+#         self.Socket.send(('GATS 1 '+str(Gate[0])+' '+str(Gate[1])+'\r').encode())
+#         self.Socket.send(('AMPS 1 13 '+str(int(self.ValidAverage(Averages)))+' 0\r').encode())
+#
+#         self.Socket.send(('AWFS 1 1\r').encode())
+#         self.Socket.send(('CALS 1\r').encode())
+#
+#         scnlngth = Gate[1] - Gate[0]
+#
+#         if self.PulserSettings['BitDepth']==16:
+#
+#             mlngth = 2*scnlngth
+#
+#         elif self.PulserSettings['BitDepth']==8:
+#
+#             mlngth = scnlngth
+#
+#         o = zeros((self.NumberOfElements,self.NumberOfElements,scnlngth))
+#
+#         for tr in range(self.NumberOfElements):
+#
+#             for rc in range(self.NumberOfElements):
+#
+#                 m = ReadExactly(self.Socket,mlngth+8)
+#
+#                 o[tr,rc,:] = BytesToFloat(m[8::],self.PulserSettings['BitDepth'])
+#
+#         self.AScans.append(o)
+#
+#     def ClearAScans(self):
+#
+#         self.AScans = []
+#
+#     def SaveScan(self,flname,Reversed=False):
+#
+#         out = self.PulserSettings.copy()
+#
+#         if Reversed:
+#
+#             out['AScans'] = self.AScans[::-1]
+#
+#         else:
+#
+#             out['AScans'] = self.AScans
+#
+#
+#         _pickle.dump(out,open(flname,'wb'))
+#
+#     def __del__(self):
+#
+#         self.Socket.close()
+#
 # #     def SetPhasedArrayInfo(self,Probe = {'NumberofElements': 16., 'Pitch': 0.6}, Wedge = {'WedgeAngle': 36., 'Height': 14.34, 'Velocity': 2330}, BeamSet = {'StartElement': 1., 'ApertureElements': 16.}, PieceVelocity = {'Compression': 5900, 'Shear': 3240}):
 # #
 # #         self.ProbeInfo = Probe
