@@ -463,9 +463,9 @@ class PeakNDT:
 
             while len(self.Buffer)<totalscanbytes:
 
-                time.sleep(0.1)
+                time.sleep(1.)
 
-            # self.StopCapture.set()
+            self.StopCapture.set()
 
             indstart = int(0)
             indstop = int(0)
@@ -518,7 +518,7 @@ class PeakNDT:
             Starts or restarts reading device buffer to local buffer
 
         """
-
+        del(self.BufferThread)
         self.StopCapture = threading.Event()
         self.BufferThread = threading.Thread(target = ReadBuffer, args = (self.Socket, self.Buffer, self.StopCapture))
         self.BufferThread.start()
