@@ -45,7 +45,7 @@ def ReadExactly(sock,size):
 
     return buff
 
-def ReadBuffer(sock,buff,size,stopcapture):
+def ReadBuffer(sock,buff,stopcapture,size=4096):
 
     while not(stopcapture.is_set()):
 
@@ -290,7 +290,7 @@ class PeakNDT:
 
         self.ScanLength = gate[1]-gate[0]
 
-        ReadLength = self.ScanLength*(int(self.PulserSettings['BitDepth'])/8) + 8
+        ReadLength = int(self.ScanLength*(int(self.PulserSettings['BitDepth'])/8) + 8)
 
         self.SetPRF(1.5e6/(Gate[1]-Gate[0]))
 
@@ -317,10 +317,11 @@ class PeakNDT:
                                 'Averages': Averages, 'PulseWidth': PulseWidth, 'Damping': Damping}
 
 
-        self.StopCapture = threading.Event()
-        self.BufferThread = threading.Thread(target = ReadBuffer, args = (self.Socket, self.Buffer, ReadLength, self.StopCapture))
-        self.BufferThread.start()
+        # self.StopCapture = threading.Event()
+        # self.BufferThread = threading.Thread(target = ReadBuffer, args = (self.Socket, self.Buffer, ReadLength, self.StopCapture))
+        # self.BufferThread.start()
 
+        self.StartBuffering()
 
     def SetFMCCapture(self, Elements, Gate, Voltage=100., Gain=20., Averages=0, PulseWidth = 1/10.):
 
@@ -370,7 +371,7 @@ class PeakNDT:
 
         self.ScanLength = gate[1]-gate[0]
 
-        ReadLength = self.ScanLength*(int(self.PulserSettings['BitDepth'])/8) + 8
+        ReadLength = int(self.ScanLength*(int(self.PulserSettings['BitDepth'])/8) + 8)
 
         self.SetPRF(1.5e6/(Gate[1]-Gate[0]))
 
@@ -398,14 +399,16 @@ class PeakNDT:
 
         self.Socket.send(('AWFS 1 1\r').encode())
 
-        self.CaptureSettings = {'CatpureType': 'FMC', 'Elements': Elements,
+        self.CaptureSettings = {'CaptureType': 'FMC', 'Elements': Elements,
                                 'Gate':Gate,'Voltage': Voltage, 'Gain': Gain,
                                 'Averages': Averages, 'PulseWidth':PulseWidth}
 
 
-        self.StopCapture = threading.Event()
-        self.BufferThread = threading.Thread(target = ReadBuffer, args = (self.Socket, self.Buffer, ReadLength, self.StopCapture))
-        self.BufferThread.start()
+        # self.StopCapture = threading.Event()
+        # self.BufferThread = threading.Thread(target = ReadBuffer, args = (self.Socket, self.Buffer, ReadLength, self.StopCapture))
+        # self.BufferThread.start()
+
+        self.StartBuffering()
 
 
     def ExecuteCapture(self, NExecutions=1, TimeBetweenCaptures = None):
@@ -433,6 +436,8 @@ class PeakNDT:
 
             self.ScanCount += 1
 
+        print(len(self.Buffer))
+
 
     def ReadBuffer(self):
 
@@ -447,42 +452,40 @@ class PeakNDT:
 
         """
 
-        Nt = self.ScanLength*(int(self.PulserSettings['BitDepth'])/8)
+        Nt = int(self.ScanLength*(int(self.PulserSettings['BitDepth'])/8)+8)
 
+        if self.CaptureSettings['CaptureType'] == 'FMC':
 
-        if self.CaptureSettings['CatpureType'] == 'FMC':
-
-            Nt = self.ScanLength*(int(self.PulserSettings['BitDepth'])/8)
             Ntr = len(self.CaptureSettings['Elements'][0])
             Nrc = len(self.CaptureSettings['Elements'][1])
 
-            totalscanbytes = self.ScanCount*(Nt+8)*Ntr*Nrc
+            totalscanbytes = self.ScanCount*Nt*Ntr*Nrc
 
             while len(self.Buffer)<totalscanbytes:
 
                 time.sleep(0.1)
 
-            self.StopCapture.set()
+            # self.StopCapture.set()
 
-            indstart = 0
-            indstop = 0
+            indstart = int(0)
+            indstop = int(0)
 
-            for s in self.ScanCount:
+            for s in range(self.ScanCount):
 
                 A = zeros((Ntr, Nrc, self.ScanLength))
 
-                for tr in Ntr:
-                    for rc in Nrc:
+                for tr in range(Ntr):
+                    for rc in range(Nrc):
 
-                        indstart = s*Ntr*Nrc*Nt+tr*Nrc*Nt+rc*Nt+8
-                        indstop = indstart + Nt + 1
+                        indstart = int(s*Ntr*Nrc*Nt+tr*Nrc*Nt+rc*Nt+8)
+                        indstop = int(indstart + Nt-8)
 
                         A[tr,rc,:] = BytesToFloat(self.Buffer[indstart:indstop], self.PulserSettings['BitDepth'])
 
                 self.AScans.append(A)
 
 
-        elif self.CaptureSettings['CatpureType'] == 'Conventional':
+        elif self.CaptureSettings['CaptureType'] == 'Conventional':
 
 
             totalscanbytes = self.ScanCount*(Nt+8)
@@ -496,16 +499,32 @@ class PeakNDT:
             indstart = 0
             indstop = 0
 
-            for s in self.ScanCount:
+            for s in range(self.ScanCount):
 
 
-                indstart = s*Nt+8
-                indstop = indstart + Nt + 1
+                indstart = s*Nt + 8
+                indstop = indstart + Nt - 8
 
                 self.AScans.append(BytesToFloat(self.Buffer[indstart:indstop],self.PulserSettings['BitDepth']))
 
-            self.ScanCount = 0
-            self.Buffer = bytearray()
+        self.ScanCount = 0
+        self.Buffer = bytearray()
+
+        # self.StartBuffering()
+
+    def StartBuffering(self):
+
+        """
+            Starts or restarts reading device buffer to local buffer
+
+        """
+
+        self.StopCapture = threading.Event()
+        self.BufferThread = threading.Thread(target = ReadBuffer, args = (self.Socket, self.Buffer, self.StopCapture))
+        self.BufferThread.start()
+
+
+
 
     def ClearScans(self):
 
