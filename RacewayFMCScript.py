@@ -3,11 +3,11 @@ from scipy.optimize import minimize
 import FMC
 import _pickle
 import multiprocessing
-import argv
+import sys
 
-pth = '/mnt/d/FMCScans/Raceway/'
+pth = '/mnt/d/FMCScans/Raceway/12DegRoofPC/'
 
-pd = _pickle.load('/mnt/d/FMCScans/ReferenceScans/4M-16x2-A27-Delays.p','rb')
+pd = 0.6*np.ones((32,32))
 
 p = (1.0,3.0)
 
@@ -50,8 +50,15 @@ eodd = [ElementCoords(n,'Odd') for n in range(16)]
 yrng = np.linspace(f(W/2),10.,round((abs(f(W/2)+10.)/0.096)))
 zrng = np.linspace(0.,p[0]*16,100)
 
-dEven = [[[minimize(Delay,x0=(e[0]/2,0.5*(e[2]+z)), args=(e,y,z) , method='BFGS') for y in yrng] for z in zrng] for e in eeven]
-dOdd = [[[minimize(Delay,x0=(e[0]/2,0.5*(e[2]+z)), args=(e,y,z) , method='BFGS') for y in yrng] for z in zrng] for e in eodd]
+# yrng = np.linspace(f(W/2),10.,round((abs(f(W/2)+10.)/0.5)))
+# zrng = np.linspace(0.,p[0]*16,10)
+
+# dEven = [[[minimize(Delay,x0=(e[0]/2,0.5*(e[2]+z)), args=(e,y,z) , method='BFGS').fun if y > 0 else np.nan for y in yrng] for z in zrng] for e in eeven]
+# dOdd = [[[minimize(Delay,x0=(e[0]/2,0.5*(e[2]+z)), args=(e,y,z) , method='BFGS').fun if y > 0 else np.nan for y in yrng] for z in zrng] for e in eodd]
+
+
+dEven = [[[minimize(Delay,x0=(e[0]/2,0.5*(e[2]+z)), args=(e,y,z) , method='BFGS').fun if y > 0 else np.nan for y in yrng] for z in zrng] for e in eeven]
+dOdd = [[[minimize(Delay,x0=(e[0]/2,0.5*(e[2]+z)), args=(e,y,z) , method='BFGS').fun if y > 0 else np.nan for y in yrng] for z in zrng] for e in eodd]
 
 
 Delays =  []
@@ -61,11 +68,15 @@ for n in range(16):
     Delays.append(dEven[n])
     Delays.append(dOdd[n])
 
+# print('Delays computed')
+#
+# print(Delays)
+
 def ProcessScans(x):
 
-    a = _pickle.load(open(pth+x,'rb'))
+    a = _pickle.load(open(pth+x+'.p','rb'))
 
-    F = FMC.LinearCapture(25.,a['AScans'],0.6,16,probedelays=pd)
+    F = FMC.LinearCapture(25.,a['AScans'],p[0],32,probedelays=pd)
 
     F.ProcessScans(200)
 
@@ -75,8 +86,8 @@ def ProcessScans(x):
 
     _pickle.dump({'Images': I, 'xGrid': zrng, 'yGrid': yrng} , open(pth+x+'-Images.p','wb'))
 
-x = argv[1::]
+x = sys.argv[1::]
 
-p = multiprocessing.pool(len(x))
+p = multiprocessing.Pool(len(x))
 
 I = p.map(ProcessScans,x)
