@@ -71,8 +71,8 @@ xrng = np.linspace(-7.5,7.5,150)
 yrng = np.linspace(f(7.5),10.-f(7.5), int(round((10.-f(7.5))/0.1)))
 
 
-dEven = [[[minimize(Delay,x0=(0.5*(e[0]+x), 0.5*e[2]), args=(e,x,y) , method='BFGS').fun if y>=f(x) else np.nan for x in xrng] for y in yrng] for e in eeven]
-dOdd = [[[minimize(Delay,x0=(0.5*(e[0]+x), 0.5*e[2]), args=(e,x,y) , method='BFGS').fun if y>=f(x) else np.nan for x in xrng] for y in yrng] for e in eodd]
+dEven = [[[minimize(Delay,x0=(0.5*(e[0]+x), 0.5*e[2]), args=(e,x,y) , method='BFGS').fun if y>=f(x) else np.nan for y in yrng] for x in xrng] for e in eeven]
+dOdd = [[[minimize(Delay,x0=(0.5*(e[0]+x), 0.5*e[2]), args=(e,x,y) , method='BFGS').fun if y>=f(x) else np.nan for y in yrng] for x in xrng] for e in eodd]
 
 
 Delays =  []
