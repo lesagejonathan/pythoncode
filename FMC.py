@@ -69,7 +69,7 @@ def EstimateDirectivityAttenuation(Scans,positions,fsamp,pitch,c,amps,delays,the
 
     r = []
 
-    for i in range(len(F.AScans)):
+    for i in range(len(F.AScans[0:2])):
 
         F.GetContactDelays(np.linspace(positions[i][0]-2.5,positions[i][0]+2.5,50), np.linspace(positions[i][1]-2.5,positions[i][1]+2.5,50), c)
 
@@ -85,9 +85,12 @@ def EstimateDirectivityAttenuation(Scans,positions,fsamp,pitch,c,amps,delays,the
 
         r.append([np.sqrt((xmax-n*pitch)**2 + ymax**2) for n in range(N)])
 
-        A.append(np.array([[np.abs(F[i].AScans[m,n,int(round(fsamp*r[i][m]+r[i][n]/c))]) for n in range(N) ] for m in range(N)]))
+        #A.append(np.array([[np.abs(F[i].AScans[m,n,int(round(fsamp*r[i][m]+r[i][n]/c))]) for n in range(N) ] for m in range(N)]))
+        A.append(np.array([[np.abs(F.AScans[i][m,n,int(round(fsamp*(r[i][m]+r[i][n])/c))]) for n in range(N) ] for m in range(N)]))
 
         Imax.append(np.amax(I))
+
+        print(str(i))
 
 
     def Loss(x):
@@ -95,18 +98,26 @@ def EstimateDirectivityAttenuation(Scans,positions,fsamp,pitch,c,amps,delays,the
         atheta = x[0:len(thetagrid)]
         ar = x[len(thetagrid)::]
 
+        print(type(atheta))
+        print(type(ar))
+
         def loss(i):
 
-            return reduce(lambda x,y: x+y, ((1. - (A[i][m,n]/Imax[i])*
-                RBF(theta[i][m],atheta[t],thetagrid[t],betat)*RBF(theta[i][n],
-                atheta[t],thetagrid[t],betat)*RBF*(r[i][m],ar[r],rgrid[r],betar)*
-                RBF(r[i][n],ar[r],rgrid[r],betar))**2 for m in range(N)
-                for n in range(N) for t in range(len(atheta)) for r in range(len(ar))))
+            return reduce(lambda x,y: x+y, [(1. - (A[i][m,n]/Imax[i])*RBF(theta[i][m],atheta[t],thetagrid[t],betat)*RBF(theta[i][n],atheta[t],thetagrid[t],betat)*RBF(r[i][m],ar[r],rgrid[r],betar)*RBF(r[i][n],ar[r],rgrid[r],betar))**2 for m in range(N) for n in range(N) for t in range(len(atheta)) for r in range(len(ar))])
 
         return reduce(lambda x,y: x+y, (loss(i) for i in range(len(Imax))))
 
     a0theta = FitRBF(thetagrid,np.sinc(pitch*np.sin(thetagrid)/(fcentre/c)),betat)
     a0r = FitRBF(rgrid,1./np.sqrt(rgrid),betar)
+
+    print(type(A[0][0,0]))
+    print(type(Imax[0]))
+    print(type(theta[0][0]))
+    # print(type(atheta[0]))
+    print(type(thetagrid[0]))
+    print(type(r[0][0]))
+    # print(type(ar[0]))
+    print(type(rgrid[0]))
 
     X = minimize(Loss, x0=list(a0theta)+list(a0r))
 
