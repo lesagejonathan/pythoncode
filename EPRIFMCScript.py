@@ -11,9 +11,9 @@ F = FMC.LinearCapture(25., s, 0.6, 64)
 
 F.ProcessScans()
 
-h1 = F.FitInterfaceCurve(0,np.linspace(1.,10.,90),ci)
+h1 = F.FitInterfaceCurve(0,np.linspace(1.,10.,90),ci)[0]
 
-h2 = F.FitInterfaceCurve(1,np.linspace(1.,10.,90),ci)
+h2 = F.FitInterfaceCurve(1,np.linspace(1.,10.,90),ci)[0]
 
 print('Block1 Processing')
 
