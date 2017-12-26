@@ -9,11 +9,11 @@ s = pickle.load(open('/mnt/d/FMCScans/EPRIBlocks-5L64-NW1.p','rb'))['AScans']
 
 F = FMC.LinearCapture(25., s, 0.6, 64)
 
-F.ProcessScans()
+F.ProcessScans(80)
 
-h1 = F.FitInterfaceCurve(0,np.linspace(1.,10.,90),ci)[0]
+h1 = F.FitInterfaceCurve(0,np.linspace(2.75,15.,150),ci)[0]
 
-h2 = F.FitInterfaceCurve(1,np.linspace(1.,10.,90),ci)[0]
+h2 = F.FitInterfaceCurve(1,np.linspace(3.,15.,150),ci)[0]
 
 print('Block1 Processing')
 
@@ -25,7 +25,7 @@ D = {}
 
 I1 = F.ApplyTFM(0)
 
-D['Block1'] = {'Image':I1, 'X':F.xRange, 'Y':F.yRange, 'h': h1}
+D['Block1'] = {'Image':I1, 'X':F.xRange, 'Y':F.yRange, 'h': h1(F.xRange)}
 
 pickle.dump(D,open('/mnt/d/FMCScans/EPRIAdaptiveImages.p','wb'))
 
@@ -38,6 +38,6 @@ I2 = F.ApplyTFM(1)
 
 D = pickle.load(open('/mnt/d/FMCScans/EPRIAdaptiveImages.p','rb'))
 
-D['Block2'] = {'Image':I2, 'X':F.xRange, 'Y':F.yRange, 'h': h2}
+D['Block2'] = {'Image':I2, 'X':F.xRange, 'Y':F.yRange, 'h': h2(F.xRange)}
 
 pickle.dump(D,open('/mnt/d/FMCScans/EPRIAdaptiveImages.p','wb'))
