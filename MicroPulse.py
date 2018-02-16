@@ -436,7 +436,6 @@ class PeakNDT:
 
             self.ScanCount += 1
 
-        print(len(self.Buffer))
 
 
     def ReadBuffer(self):
@@ -463,7 +462,7 @@ class PeakNDT:
 
             while len(self.Buffer)<totalscanbytes:
 
-                time.sleep(1.)
+                time.sleep(1e-3)
 
             self.StopCapture.set()
 
@@ -518,12 +517,13 @@ class PeakNDT:
             Starts or restarts reading device buffer to local buffer
 
         """
-        del(self.BufferThread)
+        if hasattr(self, 'BufferThread'):
+            del(self.BufferThread)
+
+
         self.StopCapture = threading.Event()
         self.BufferThread = threading.Thread(target = ReadBuffer, args = (self.Socket, self.Buffer, self.StopCapture))
         self.BufferThread.start()
-
-
 
 
     def ClearScans(self):

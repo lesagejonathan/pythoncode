@@ -1,10 +1,26 @@
 import gclib
 
-
-
 class Controller:
 
-    def __init__(self,ip='10.10.1.12'):
+    def __init__(self,instrument='ImmersionTank'):
+
+
+        if instrument is 'ImmersionTank':
+
+            self.AxisKeys = {'X':'A','Y':'B','Z':'C','Rotation':'D'}
+
+            self.StepsPerMeasure = {'X':1000.,'Y':801.721016,'Z':1000.,'Rotation':160.*1000./360.}
+
+            ip = '10.10.1.12'
+
+        elif instrument is 'ZMC4':
+
+            self.AxisKeys = {'Rotation':'A', 'Index':'B'}
+
+            self.StepsPerMeasure = {'Index':131345. , 'Rotation':79.6}
+
+            ip = '169.254.157.1'
+
 
         self.Galil = gclib.py()
 
@@ -12,18 +28,13 @@ class Controller:
 
         self.CurrentPosition = {}
 
-        self.AxisKeys = {'X':'A','Y':'B','Z':'C','Rotation':'D'}
 
         for k in list(self.AxisKeys.keys()):
 
             self.ZeroEncoder(k)
 
-        self.StepsPerMeasure = {'X':1000.,'Y':801.721016,'Z':1000.,'Rotation':160.*1000./360.}
-
 
     def MoveRelative(self,Axis,Position,Speed):
-
-
         # set Speed
 
         self.Galil.GCommand('SH'+self.AxisKeys[Axis])
