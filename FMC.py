@@ -975,9 +975,9 @@ class LinearCapture:
             fftshift(ifftn(I, axes=(1, 0), s=(Nx, 2 * Ny - 2)), axes=(1,)))
 
     def AttenuationTomography(
-        self, ScanIndex, RefIndex, c, d, fband, resolution=(
+        self, ScanIndex, RefIndex, c, d, fband, fpower, resolution=(
             0.6, 0.6), windowparams=(
-            50, 0.1, 4)):
+            50, 0.1, 4), rcondnum = 1e-5):
 
         from scipy.signal import tukey
         from numpy.fft import irfft2, irfft
@@ -986,14 +986,14 @@ class LinearCapture:
         dx = resolution[0]
         dy = resolution[1]
 
-        Nx = int(round(self.NumberOfElements * self.Pitch / dx))
-        Ny = int(round(d / dy))
+        Nx = int(np.floor(self.NumberOfElements * self.Pitch / dx)) + 1
+        Ny = int(np.floor(d / dy)) + 1
 
         # G0 = np.zeros((int(self.NumberOfElements**2), 1), dtype=complex)
         # G1 = np.zeros((int(self.NumberOfElements**2), 1), dtype=complex)
 
-        G0 = np.zeros((int(self.NumberOfElements**2), 1), dtype=float)
-        G1 = np.zeros((int(self.NumberOfElements**2), 1), dtype=float)
+
+        G = np.zeros((int(self.NumberOfElements**2), 1), dtype=float)
 
 
         # kx, ky = np.meshgrid(2. * np.pi * np.linspace(-1 / (2 * dx), 1 / (2 * dx), Nx),
@@ -1011,6 +1011,10 @@ class LinearCapture:
         B = np.zeros((int(self.NumberOfElements * self.NumberOfElements),
                       int(Nx*Ny)), dtype=float)
 
+
+        # B = np.zeros((int(self.NumberOfElements * self.NumberOfElements/2),
+        #                   int(Nx*Ny)), dtype=float)
+
         w = tukey(int(2 * windowparams[0]), windowparams[1])
         #
         f = np.linspace(0., self.SamplingFrequency / 2,
@@ -1020,7 +1024,7 @@ class LinearCapture:
 
         f = f[indf]
 
-        GG = []
+
 
         for m in range(self.NumberOfElements):
 
@@ -1030,59 +1034,129 @@ class LinearCapture:
 
             for n in range(self.NumberOfElements):
 
+            # for n in range(m,self.NumberOfElements):
+
+
                 xn = n * self.Pitch
 
                 ind = int(round(2 * self.SamplingFrequency *
                                 np.sqrt((0.5 * (xn - xm))**2 + d**2) / c))
 
-                RR = rfft(np.real(self.AScans[RefIndex])[m, n, ind -
-                                                         windowparams[0]:ind -
-                                                         windowparams[0] +
-                                                         int(2 *
-                                                             windowparams[0])], int(len(w) *
-                                                                                    windowparams[2]))
 
-                R = rfft(np.real(self.AScans[ScanIndex])[m, n, ind -
-                                                         windowparams[0]:ind -
-                                                         windowparams[0] +
-                                                         int(2 *
-                                                             windowparams[0])], int(len(w) *
-                                                                                    windowparams[2]))
-
-                # rr =np.real(self.AScans[RefIndex])[m,n,ind-windowparams[0]:ind-windowparams[0] + int(2*windowparams[0])]
+                # RR = np.max(np.abs(self.AScans[RefIndex][m, n, ind -
+                #                                          windowparams[0]:ind -
+                #                                          windowparams[0] +
+                #                                          int(2 *
+                #                                              windowparams[0])]))
                 #
-                # r = np.real(self.AScans[ScanIndex])[m,n,ind-windowparams[0]:ind-windowparams[0] + int(2*windowparams[0])]
+                # R = np.max(np.abs(self.AScans[ScanIndex][m, n, ind -
+                #                                              windowparams[0]:ind -
+                #                                              windowparams[0] +
+                #                                              int(2 *
+                #                                                  windowparams[0])]))
+                #
+                #
+                indrr = np.argmax(np.abs(self.AScans[RefIndex][m, n, ind -
+                                                         windowparams[0]:ind -
+                                                         windowparams[0] +
+                                                         int(2 *
+                                                             windowparams[0])])) + ind - windowparams[0]
 
-                GG.append([R, RR])
+
+                indr = np.argmax(np.abs(self.AScans[ScanIndex][m, n, ind -
+                                                         windowparams[0]:ind -
+                                                         windowparams[0] +
+                                                         int(2 *
+                                                             windowparams[0])])) + ind - windowparams[0]
+
+
+                #
+
+                RR = rfft(w*np.real(self.AScans[RefIndex])[m, n, indrr -
+                                                         windowparams[0]:indrr -
+                                                         windowparams[0] +
+                                                         int(2 *
+                                                             windowparams[0])], int(len(w) *
+                                                                                    windowparams[2]))
+
+                R = rfft(w*np.real(self.AScans[ScanIndex])[m, n, indr -
+                                                         windowparams[0]:indr -
+                                                         windowparams[0] +
+                                                         int(2 *
+                                                             windowparams[0])], int(len(w) *
+                                                                                    windowparams[2]))
+
+                #
+                # RR = rfft(w*np.real(self.AScans[RefIndex])[m, n, ind -
+                #                                                  windowparams[0]:ind -
+                #                                                  windowparams[0] +
+                #                                                  int(2 *
+                #                                                      windowparams[0])], int(len(w) *
+                #                                                                             windowparams[2]))
+                #
+                # R = rfft(w*np.real(self.AScans[ScanIndex])[m, n, ind -
+                #                                                  windowparams[0]:ind -
+                #                                                  windowparams[0] +
+                #                                                  int(2 *
+                #                                                      windowparams[0])], int(len(w) *
+                #                                                                             windowparams[2]))
 
                 RR = RR[indf]
                 R = R[indf]
+                #
+                GG = np.log(np.abs(RR)/np.abs(R))
+                # #
+                # # GGG.append(GG)
+                #
+                G[n+m*self.NumberOfElements, 0] = np.trapz(GG/(f**fpower),dx=(f[1]-f[0]))/(fband[1]-fband[0])
 
-                G = np.log(np.abs(R)/np.abs(RR))
+                # G[n+m*self.NumberOfElements, 0] = np.log(RR/R)
+
 
                 # G = np.log(np.abs(R * np.conj(RR) /
                 #                   (RR * np.conj(RR) + 1e-2 * np.amax(np.abs(RR)))))
 
-                pfit = np.polyfit(f, G, 1)
+                # pfit = np.polyfit(f, G, 1)
 
-                G0[n + m * self.NumberOfElements, 0] = pfit[1]
-                G1[n + m * self.NumberOfElements, 0] = -pfit[0]
+                # G0[n + m * self.NumberOfElements, 0] = pfit[1]
+                # G1[n + m * self.NumberOfElements, 0] = -pfit[0]
+
+
+                # G0[n+m*self.NumberOfElements, 0] = np.trapz(-G,dx=(f[1]-f[0]))/(fband[1]-fband[0])
+                #
+                # G1[n+m*self.NumberOfElements, 0] = np.trapz(-G/f,dx=(f[1]-f[0]))/(fband[1]-fband[0])
+                #
+                # GG.append(G0)
+
 
                 def xf(y):
-                    return (xn-xm)*y/(2*d) + xm
+                    return (((xn-xm)*y)/(2*d)) + xm
 
                 def yf(x):
-                    return (x - xm)*2*d/(xn - xm)
+                    return ((x - xm)*2*d)/(xn - xm)
 
                 def xb(y):
-                    return (xm-xn)*y/(2*d) + xn
+                    return (((xm-xn)*y)/(2*d)) + xn
 
                 def yb(x):
-                    return (x - xn)*2*d/(xm - xn)
+                    return ((x - xn)*2*d)/(xm - xn)
 
-                r = []
 
-                pq = []
+                # def xf(y):
+                #     return (xn-3*xm)*y/(2*d) + xm
+                #
+                # def yf(x):
+                #     return 2*d*(x-xm)/(xn-3*xm)
+                #
+                # def xb(y):
+                #     return -(xm+xn)*y/(2*d) + xn
+                #
+                # def yb(x):
+                #     return -(x - xn)*2*d/(xm + xn)
+
+
+                xy = []
+
 
                 for p in range(int(round(np.ceil(xm/dx))), int(round(np.floor(xf(d)/dx)))):
 
@@ -1090,9 +1164,11 @@ class LinearCapture:
 
                     yp = yf(xp)
 
-                    pq.append([p, int(np.floor(yp/dy))])
+                    # pq.append([p, int(np.floor(yp/dy))])
+                    #
+                    # r.append(np.sqrt(xp**2 + yp**2))
 
-                    r.append(np.sqrt(xp**2 + yp**2))
+                    xy.append([xp, yp])
 
                 for q in range(Ny):
 
@@ -1100,45 +1176,55 @@ class LinearCapture:
 
                     xq = xf(yq)
 
-                    pq.append([int(np.floor(xq/dx)), q])
+                    # pq.append([int(np.floor(xq/dx)), q])
+                    #
+                    # r.append(np.sqrt(xq**2 + yq**2))
 
-                    r.append(np.sqrt(xq**2 + yq**2))
-
-
-                r = np.array(r)
-                pq = np.array(pq)
-
-                indr = np.argsort(r)
-
-                pq = pq[indr,:]
-                r = r[indr]
+                    xy.append([xq,yq])
 
 
-                r = np.diff(r)
+                xy = np.array(xy).reshape((len(xy),2))
+
+                ixysort = np.argsort(xy[:,1])
+
+                xy = xy[ixysort,:]
+
+                # print(xy[:,0])
+                #
+                # print(xy[:,1])
+
+                for i in range(xy.shape[0]-1):
+
+                    x0 = xy[i, 0]
+                    x1 = xy[i+1 , 0]
+
+                    y0 = xy[i, 1]
+                    y1 = xy[i+1, 1]
+
+                    p = int(np.floor(x0/dx))
+                    q = int(np.floor(y0/dy))
+
+                    r = np.sqrt((x1 - x0)**2 + (y1 - y0)**2)
+
+                    B[n + m * self.NumberOfElements, p+q*Nx] = B[n + m * self.NumberOfElements, p+q*Nx] + r
 
 
 
-                for i in range(pq.shape[0]-1):
 
-                    B[n + m * self.NumberOfElements, pq[i,0]+pq[i,1]*Nx] = r[i]
+                xy = []
 
 
-                r = []
-
-                pq = []
-
-                for p in range(int(round(np.ceil(xf(d)/dx))), int(round(np.floor(xn/dx)))):
+                for p in range(int(np.ceil(xf(d)/dx)), int(np.floor(xn/dx))):
 
                     xp = dx*p
 
                     yp = yb(xp)
 
-                    pq.append([p, int(np.floor(yp/dy))])
-
-                    r.append(np.sqrt(xp**2 + yp**2))
-
+                    # pq.append([p, int(np.floor(yp/dy))])
+                    #
                     # r.append(np.sqrt(xp**2 + yp**2))
 
+                    xy.append([xp, yp])
 
                 for q in range(Ny):
 
@@ -1146,36 +1232,120 @@ class LinearCapture:
 
                     xq = xb(yq)
 
-                    # print(yq)
-
-
-                    pq.append([int(np.floor(xq/dx)), q])
-
+                    # pq.append([int(np.floor(xq/dx)), q])
+                    #
                     # r.append(np.sqrt(xq**2 + yq**2))
 
-                    r.append(np.sqrt(xq**2 + yq**2))
+                    xy.append([xq,yq])
+
+
+                xy = np.array(xy).reshape((len(xy),2))
+
+                ixysort = np.argsort(xy[:,1])
+
+                ixysort = ixysort[::-1]
+
+                xy = xy[ixysort, :]
+
+                # print(xy[:,0])
+                # print(xy[:,1])
+
+
+                # print(xy)
+
+
+                for i in range(xy.shape[0]-1):
+
+                    x0 = xy[i, 0]
+                    x1 = xy[i+1 , 0]
+
+                    y0 = xy[i, 1]
+                    y1 = xy[i+1, 1]
+
+                    p = int(np.floor(x0/dx))
+                    q = int(np.floor(y0/dy))
+
+                    r = np.sqrt((x1 - x0)**2 + (y1 - y0)**2)
+
+                    B[n + m * self.NumberOfElements, p+q*Nx] = B[n + m * self.NumberOfElements, p+q*Nx] + r
 
 
 
 
-                r = np.array(r)
-                pq = np.array(pq)
+                # r = np.array(r)
+                # pq = np.array(pq)
+                #
+                # indr = np.argsort(r)
+                #
+                # pq = pq[indr,:]
+                # r = r[indr]
+                #
+                #
+                # r = np.diff(r)
 
-                indr = np.argsort(r)
 
-                pq = pq[indr,:]
-                r = r[indr]
-
-                r = np.diff(r)
-
-                # print(pq)
-                # print(r)
-
-                for i in range(pq.shape[0]-1):
-
-                    # B[n + m * self.NumberOfElements, pq[i,0]+pq[i,1]*Ny] = r[i]
-
-                    B[n + m * self.NumberOfElements, pq[i,0]+pq[i,1]*Nx] = r[i]
+                #
+                # for i in range(len(p):
+                #
+                #     B[n + m * self.NumberOfElements, pq[i,0]+pq[i,1]*Nx] =
+                #
+                #
+                # r = []
+                #
+                # pq = []
+                #
+                # for p in range(int(round(np.ceil(xf(d)/dx))), int(round(np.floor(xn/dx)))):
+                #
+                #     xp = dx*p
+                #
+                #     yp = yb(xp)
+                #
+                #     pq.append([p, int(np.floor(yp/dy))])
+                #
+                #     r.append(np.sqrt(xp**2 + yp**2))
+                #
+                #     # r.append(np.sqrt(xp**2 + yp**2))
+                #
+                #
+                # for q in range(Ny):
+                #
+                #     yq = dy*q
+                #
+                #     xq = xb(yq)
+                #
+                #     # print(yq)
+                #
+                #
+                #     pq.append([int(np.floor(xq/dx)), q])
+                #
+                #     # r.append(np.sqrt(xq**2 + yq**2))
+                #
+                #     r.append(np.sqrt(xq**2 + yq**2))
+                #
+                #
+                #
+                #
+                # r = np.array(r)
+                # pq = np.array(pq)
+                #
+                # indr = np.argsort(r)
+                #
+                # pq = pq[indr,:]
+                # r = r[indr]
+                #
+                # r = np.diff(r)
+                #
+                # # print(pq)
+                # # print(r)
+                #
+                # for i in range(pq.shape[0]-1):
+                #
+                #     # B[n + m * self.NumberOfElements, pq[i,0]+pq[i,1]*Ny] = r[i]
+                #
+                #     B[n + m * self.NumberOfElements, pq[i,0]+pq[i,1]*Nx] = r[i]
+                #
+                #
+                #
 
 
 
@@ -1190,27 +1360,38 @@ class LinearCapture:
                 #     xn - xm) / d + ky)) - (np.exp(1j * kx * xn) * (np.exp(1j * (kx * 0.5 * (xm - xn) + ky * d)) - 1)) / (1j * (kx * 0.5 * (xm - xn) / d + ky))
 
         # indnz = (np.real(G0) > 0.).flatten()
-
-        # G0 = np.nan_to_num(G0)
         #
-        # G1 = np.nan_to_num(G1)
-
+        # # G0 = np.nan_to_num(G0)
+        # #
+        # # G1 = np.nan_to_num(G1)
         #
+        # #
         # G0 = G0[indnz]
         #
         # G1 = G1[indnz]
-
-        # B = np.nan_to_num(B)
-
+        #
+        # # B = np.nan_to_num(B)
+        #
         # B = B[indnz,:]
 
         # print(np.amax(np.abs(B)))
 
         # A0 = np.linalg.lstsq(B, G0)[0].reshape(kxyshape)
 
-        I0 = np.linalg.lstsq(B, G0, rcond=None)[0].reshape((Ny,Nx))
+        # print(np.linalg.cond(B))
+        #
+        # G0[G0<0.] = 0.
+        #
+        # G1[G1<0.] = 0.
+        #
+        #
+        # I0 = np.linalg.lstsq(B, G0, rcond=rcondnum)[0].reshape((Ny,Nx))
+        #
+        # I1 = np.linalg.lstsq(B, G1, rcond=rcondnum)[0].reshape((Ny,Nx))
 
-        I1 = np.linalg.lstsq(B, G1, rcond=None)[0].reshape((Ny,Nx))
+
+        I = np.linalg.lstsq(B, G, rcond=rcondnum)[0].reshape((Ny,Nx))
+
 
 
         #
@@ -1224,4 +1405,6 @@ class LinearCapture:
         #
         # I1 = fftshift(ifftn(A1, axes=(1, 0), s=(Nx, Ny)))
 
-        return I0, I1, G0, G1
+
+
+        return I, G
