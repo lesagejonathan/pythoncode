@@ -195,6 +195,13 @@ class PeakNDT:
         return int(ClosestValue(wdthset,width*1e3))
 
 
+    def SetPAFilter(self,filtersettings):
+
+        fsettings = list(range(1,5))
+        ssettings = list(range(1,9))
+
+        self.Socket.send(('FRQ 0 '+str(ClosestValue(fsettings,filtersettings[0]))+' 'str(ClosestValue(ssettings,filtersettings[1]))+'\r').encode())
+
     def ValidConventionalPulseWidth(self, width):
 
         """
@@ -323,7 +330,7 @@ class PeakNDT:
 
         self.StartBuffering()
 
-    def SetFMCCapture(self, Elements, Gate, Voltage=100., Gain=20., Averages=0, PulseWidth = 1/10.):
+    def SetFMCCapture(self, Elements, Gate, Voltage=100., Gain=20., Averages=0, PulseWidth = 1/10., FilterSettings=(4,1)):
 
         """ Sets FMC Type Capture to be executed
 
@@ -355,8 +362,10 @@ class PeakNDT:
 
         """
 
+
         self.Socket.send(('STX 1\r').encode())
 
+        self.SetPAFilter(FilterSettings)
 
         if type(Elements) is int:
 
@@ -491,7 +500,7 @@ class PeakNDT:
 
             while len(self.Buffer)<totalscanbytes:
 
-                time.sleep(0.1)
+                time.sleep(1e-3)
 
             self.StopCapture.set()
 
