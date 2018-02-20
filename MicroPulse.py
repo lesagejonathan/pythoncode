@@ -60,7 +60,7 @@ def ReadBuffer(sock,buff,stopcapture,size=4096):
 
 class PeakNDT:
 
-    def __init__(self,ip='10.10.1.2',port=1067, fsamp=25, bitdepth=16):
+    def __init__(self,ip='169.254.157.5',port=1067, fsamp=25, bitdepth=16):
 
 
         self.IP = ip
@@ -86,6 +86,8 @@ class PeakNDT:
         self.PulserSettings['SamplingFrequency'] = int(fs)
 
         self.Socket.send(('SRST '+str(fs)+'\r').encode())
+
+        ReadExactly(self.Socket,32)
 
     def SetPRF(self,prf):
 
@@ -200,7 +202,7 @@ class PeakNDT:
         fsettings = list(range(1,5))
         ssettings = list(range(1,9))
 
-        self.Socket.send(('FRQ 0 '+str(ClosestValue(fsettings,filtersettings[0]))+' 'str(ClosestValue(ssettings,filtersettings[1]))+'\r').encode())
+        self.Socket.send(('FRQ 0 '+str(ClosestValue(fsettings,filtersettings[0]))+' '+str(ClosestValue(ssettings,filtersettings[1]))+'\r').encode())
 
     def ValidConventionalPulseWidth(self, width):
 
@@ -284,7 +286,7 @@ class PeakNDT:
 
         """
 
-        self.Socket.send(('STX 1\r').encode())
+        # self.Socket.send(('STX 1\r').encode())
 
 
         # Currently only setting channel damping and pulse widths to the same value
@@ -362,8 +364,9 @@ class PeakNDT:
 
         """
 
-
-        self.Socket.send(('STX 1\r').encode())
+        #
+        # self.Socket.send(('STX 1\r').encode())
+        # ReadExactly(self.Socket,24)
 
         self.SetPAFilter(FilterSettings)
 
@@ -410,7 +413,7 @@ class PeakNDT:
 
         self.CaptureSettings = {'CaptureType': 'FMC', 'Elements': Elements,
                                 'Gate':Gate,'Voltage': Voltage, 'Gain': Gain,
-                                'Averages': Averages, 'PulseWidth':PulseWidth}
+                                'Averages': Averages, 'PulseWidth':PulseWidth, 'FilterSettings':FilterSettings}
 
 
         # self.StopCapture = threading.Event()
@@ -467,6 +470,8 @@ class PeakNDT:
             Ntr = len(self.CaptureSettings['Elements'][0])
             Nrc = len(self.CaptureSettings['Elements'][1])
 
+
+
             totalscanbytes = self.ScanCount*Nt*Ntr*Nrc
 
             while len(self.Buffer)<totalscanbytes:
@@ -474,6 +479,9 @@ class PeakNDT:
                 time.sleep(1e-3)
 
             self.StopCapture.set()
+
+
+            print(len(self.Buffer))
 
             indstart = int(0)
             indstop = int(0)
@@ -549,6 +557,7 @@ class PeakNDT:
         self.ScanCount = 0
 
         self.Socket.send(('STX 1\r').encode())
+        ReadExactly(self.Socket, 8)
 
         self.Buffer = bytearray()
 
@@ -588,6 +597,7 @@ class PeakNDT:
     def __del__(self):
 
         self.Socket.send(('STX 1\r').encode())
+        ReadExactly(self.Socket,8)
         self.Socket.close()
 
 
