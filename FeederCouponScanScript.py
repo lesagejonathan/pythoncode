@@ -33,6 +33,9 @@ dtmin = 32*32/20000.
 
 els = list(range(1,17))[-1::] + list(range(65,65+17))[-1::]
 
+pos = np.linspace(0.,circumference,NScan)
+
+
 if dt<dtmin:
 
     print("Scan Speed Must be Less Than "+str(scanres/dtmin))
@@ -47,23 +50,22 @@ g.MoveToLimit('Index', indexspeed, 'Forward', Limit=30.)
 
 g.MoveRelative('Index', -21., indexspeed, Wait=True)
 
-def Scan():
+def Scan(mc):
 
     p = mp.PeakNDT(fsamp=25.)
 
     p.SetFMCCapture((els,els), Gate = (0., 75.), Voltage=200., Gain=70., Averages=0, PulseWidth = 1/10., FilterSettings=(4,1))
 
 
-    g.MoveAbsolute('Rotation', circumference, scanspeed, Wait=True)
+    mc.MoveAbsolute('Rotation', circumference, scanspeed, Wait=True)
 
     p.ExecuteCapture(NScan, dt)
 
 
-    g.MoveAbsolute('Rotation', 0., scanspeed, Wait=True)
+    mc.MoveAbsolute('Rotation', 0., scanspeed, Wait=True)
 
     p.ReadBuffer()
 
-    pos = np.linspace(0.,circumference,NScan)
 
     F = FMC.LinearCapture(25., p.AScans, 32, 0.6)
 
@@ -107,12 +109,12 @@ def Scan():
 
 
 
-p = Scan()
+p = Scan(g)
 
 
 while p is None:
 
-    p = Scan()
+    p = Scan(g)
 
 
 p.SaveScans(scanpth+samplename+'A.p', {'ScanPositions': pos, 'IndexOffset':'90 degree skew at HAZ'})
