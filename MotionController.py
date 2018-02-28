@@ -1,4 +1,5 @@
 import gclib
+import time
 
 class Controller:
 
@@ -19,7 +20,7 @@ class Controller:
 
             self.StepsPerMeasure = {'Index':131345. , 'Rotation':79.6}
 
-            ip = '169.254.157.1'
+            ip = '192.168.1.250'
 
 
         self.Galil = gclib.py()
@@ -34,8 +35,24 @@ class Controller:
             self.ZeroEncoder(k)
 
 
-    def MoveRelative(self,Axis,Position,Speed):
+    def Wait(self):
+
+        inmotion = True
+
+        while inmotion:
+
+            axisinmotion = [self.CheckMotionComplete(axis) for axis in list(self.AxisKeys.keys())]
+
+            inmotion = not(all(axisinmotion))
+
+
+    def MoveRelative(self,Axis,Position,Speed, Wait=False):
         # set Speed
+
+        if Wait:
+
+            self.Wait()
+
 
         self.Galil.GCommand('SH'+self.AxisKeys[Axis])
 
@@ -54,7 +71,11 @@ class Controller:
 
         self.CurrentPosition[Axis] += Position
 
-    def MoveAbsolute(self,Axis,Position,Speed):
+    def MoveAbsolute(self,Axis,Position,Speed,Wait=False):
+
+        if Wait:
+
+            self.Wait()
 
         # set Speed
 
@@ -77,8 +98,39 @@ class Controller:
     def ZeroEncoder(self,Axis):
 
         self.Galil.GCommand('DP'+self.AxisKeys[Axis]+'=0')
-
         self.CurrentPosition[Axis] = 0.0
+
+    def CheckMotionComplete(self, Axis):
+
+        return not(bool(int(float(self.Galil.GCommand('MG _BG'+self.AxisKeys[Axis])))))
+
+
+    def MoveToLimit(self, Axis, Speed, Direction, Limit=5000):
+
+
+        if Direction == 'Forward':
+
+                self.MoveRelative(Axis,Limit,Speed,Wait=True)
+
+                notlimit = True
+
+                while notlimit:
+
+                    notlimit = bool(int(float(self.Galil.GCommand('MG _LF'+self.AxisKeys[Axis]))))
+
+
+        elif Direction == 'Backward':
+
+
+                self.MoveRelative(Axis,-Limit,Speed,Wait=True)
+
+                notlimit = True
+
+                while notlimit:
+
+                    notlimit = bool(int(float(self.Galil.GCommand('MG _LR'+self.AxisKeys[Axis]))))
+
+
 
     def __del__(self):
 

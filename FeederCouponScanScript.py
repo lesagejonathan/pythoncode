@@ -11,16 +11,19 @@ import matplotlib.pylab as plt
 scanpth = '/mnt/c/Users/jlesage/Documents/ANSFeederTubeProject/'
 
 samplename = sys.argv[1]
-diameter = float(sys.argv[2])*25.4
+# diameter = float(sys.argv[2])*25.4
+circumference = float(sys.argv[2])
 
-scanspeed = 1.0
+index = float(sys.argv[3])
+
+indexspeed = 0.5
 
 
-scanres = 0.5
+scanspeed = 3.
 
-circ = np.pi*diameter
 
-NScan = int(np.round(circ/scanres))
+scanres = 3
+NScan = int(np.round(circumference/scanres))
 
 # drot = (2.*scanres/diameter)*(180./np.pi)
 
@@ -28,64 +31,105 @@ dt = scanres/scanspeed
 
 dtmin = 32*32/20000.
 
-els = list(range(1,17)) + list(range(65,65+17))
+els = list(range(1,17))[-1::] + list(range(65,65+17))[-1::]
 
 if dt<dtmin:
 
-    print("Scan Speed Must be Less Than "+str(drot/dtmin))
+    print("Scan Speed Must be Less Than "+str(scanres/dtmin))
     sys.exit()
 
-p = mp.MicroPulse(fsamp=25.)
+
+# First skew
+
+g = mc.Controller(instrument = 'ZMC4')
+
+g.MoveToLimit('Index', indexspeed, 'Forward', Limit=30.)
+
+g.MoveRelative('Index', -21., indexspeed, Wait=True)
+
+def Scan():
+
+    p = mp.PeakNDT(fsamp=25.)
+
+    p.SetFMCCapture((els,els), Gate = (0., 75.), Voltage=200., Gain=70., Averages=0, PulseWidth = 1/10., FilterSettings=(4,1))
 
 
-p.SetFMCCapture((els,els), Gate = (5., 50.), Voltage=200., Gain=70., Averages=0, PulseWidth = 1/10., FilterSettings=(4,1))
+    g.MoveAbsolute('Rotation', circumference, scanspeed, Wait=True)
 
-g = mc.MotionController(Instrument = 'ZMC4')
-
-g.MoveAbsolute('Rotation', scanspeed , circ)
-
-p.ExecuteCapture(NScan, dt)
-
-p.ReadBuffer()
-
-pos = np.linspace(0.,circ,NScan)
+    p.ExecuteCapture(NScan, dt)
 
 
-F = FMC.LinearCapture(25., p.AScans, 32, 0.6)
+    g.MoveAbsolute('Rotation', 0., scanspeed, Wait=True)
 
-# F.ProcessScans(T0 = p.PulserSettings['Gate'][0])
-#
-# Acopy = copy.deepcopy(F.AScans)
+    p.ReadBuffer()
 
-F.KeepElements(range(16))
+    pos = np.linspace(0.,circumference,NScan)
 
-I0 = np.abs(np.array([F.PlaneWaveSweep(i, [-39.], 2.33) for i in range(len(p.AScans))]).transpose())
+    F = FMC.LinearCapture(25., p.AScans, 32, 0.6)
 
-# F.AScans = Acopy
-#
-# del(Acopy)
+    # F.ProcessScans(T0 = p.PulserSettings['Gate'][0])
+    #
+    # Acopy = copy.deepcopy(F.AScans)
 
-F = FMC.LinearCapture(25., p.AScans, 32, 0.6)
+    F.KeepElements(range(16))
+
+    I0 = np.abs(np.array([F.PlaneWaveSweep(i, [-39.], 2.33) for i in range(len(p.AScans))]).transpose())
+
+    # F.AScans = Acopy
+    #
+    # del(Acopy)
+
+    F = FMC.LinearCapture(25., p.AScans, 32, 0.6)
+
+    F.KeepElements(range(16,33))
+
+    I1 = np.abs(np.array([F.PlaneWaveSweep(i, [-39.], 2.33) for i in range(len(p.AScans))]).transpose())
+
+    fig, ax = plt.subplots(nrows=2)
+
+    ax[0].imshow(I0[int(5*25.)::,:])
+
+    ax[1].imshow(I1[int(5*25.)::,:])
+
+    plt.show()
+
+    yn = input("Scan Acceptable ? (y/n)")
+
+    if yn == 'y':
+
+        return p
+
+    else:
+
+        del(p)
+
+        return None
 
 
-F.KeepElements(range(17,33))
 
-I1 = np.abs(np.array([F.PlaneWaveSweep(i, [-39.], 2.33) for i in range(len(p.AScans))]).transpose())
+p = Scan()
 
 
-fig, ax = plt.subplots(nrows=2)
+while p is None:
 
-ax[0].imshow(I0)
+    p = Scan()
 
-ax[1].imshow(I1)
 
-plt.show()
+p.SaveScans(scanpth+samplename+'A.p', {'ScanPositions': pos, 'IndexOffset':'90 degree skew at HAZ'})
 
-yn = input("Scan Acceptable (y/n)")
+del(p)
 
-if yn =='y':
+g.MoveRelative('Index', index, indexspeed, Wait=True)
 
-    p.SaveScans(scanpth+samplename+'.p', {'ScanPositions': pos})
+p = Scan()
+
+
+while p is None:
+
+    p = Scan()
+
+
+p.SaveScans(scanpth+samplename+'B.p', {'ScanPositions': pos, 'IndexOffset':'270 degree skew at HAZ'})
 
 del(p)
 del(g)

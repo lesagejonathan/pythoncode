@@ -60,7 +60,7 @@ def ReadBuffer(sock,buff,stopcapture,size=4096):
 
 class PeakNDT:
 
-    def __init__(self,ip='169.254.157.5',port=1067, fsamp=25, bitdepth=16):
+    def __init__(self,ip='192.168.1.150',port=1067, fsamp=25, bitdepth=16):
 
 
         self.IP = ip
