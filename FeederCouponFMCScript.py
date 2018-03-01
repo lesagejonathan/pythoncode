@@ -1,5 +1,5 @@
 import MicroPulse as mp
-import MotionController as mc
+# import MotionController as mc
 import sys
 import numpy as np
 import FMC
@@ -31,64 +31,79 @@ else:
     sys.exit()
 
 
-resolution = 0.5
+resolution = 1.
 scanspeed = 4.0
 
-els = list(range(1,17))[-1::] + list(range(65,65+17))[-1::]
+# els = list(range(1,17))[-1::] + list(range(65,65+17))[-1::]
 
-NScan = int(np.round((circumference + 5.)/0.5))
+els = list(range(1,17))+ list(range(65,65+16))
+
+NScan = int(np.round((circumference + 10.)/resolution))
 
 dt = resolution/scanspeed
 
-
 p = mp.PeakNDT(fsamp=25.)
 
-p.SetFMCCapture((els,els), Gate = (0., 75.), Voltage=200., Gain=70., Averages=0, PulseWidth = 1/10., FilterSettings=(4,1))
+p.SetFMCCapture((els,els), Gate = (0., 49.), Voltage=200., Gain=70., Averages=0, PulseWidth = 1/10., FilterSettings=(4,1))
 
-ss = input('Press any key to start capturing')
+ss = input('Press any Enter to start capturing')
 
 p.ExecuteCapture(NScan, dt)
+
+print('Finished Scan, Reading Data ...')
 p.ReadBuffer()
 
-pos = np.linspace(0.,circumference,NScan)
+p.SaveScans(scanpth+samplename+index+'.p',info)
 
-F = FMC.LinearCapture(25., p.AScans, 32, 0.6)
+print('Saving Data ...')
 
-# F.ProcessScans(T0 = p.PulserSettings['Gate'][0])
+# pos = np.linspace(0.,circumference,NScan)
 #
-# Acopy = copy.deepcopy(F.AScans)
+# F = FMC.LinearCapture(25., p.AScans, 0.5, 32)
+#
+# # F.ProcessScans(T0 = p.PulserSettings['Gate'][0])
+# #
+# # Acopy = copy.deepcopy(F.AScans)
+#
+# F.KeepElements(range(16))
+#
+# I0 = np.abs(np.array([F.PlaneWaveSweep(i, np.array([39.]), 2.33) for i in range(len(p.AScans))]))
+#
+# I0 = I0[:,0,:].transpose()
 
-F.KeepElements(range(16))
-
-I0 = np.abs(np.array([F.PlaneWaveSweep(i, [-39.], 2.33) for i in range(len(p.AScans))]).transpose())
 
 # F.AScans = Acopy
 #
 # del(Acopy)
 
-F = FMC.LinearCapture(25., p.AScans, 32, 0.6)
-
-F.KeepElements(range(16,33))
-
-I1 = np.abs(np.array([F.PlaneWaveSweep(i, [-39.], 2.33) for i in range(len(p.AScans))]).transpose())
-
-fig, ax = plt.subplots(nrows=2)
-
-ax[0].imshow(I0[int(5*25.)::,:])
-
-ax[1].imshow(I1[int(5*25.)::,:])
-
-plt.show()
-
-yn = input("Scan Acceptable ? (y for yes, any key for no)")
-
-if yn=='y':
-
-    p.SaveScans(scanpth+samplename+index+'.p',info)
-
-    del(p)
-
-else:
-
-    del(p)
-    sys.exit()
+# F = FMC.LinearCapture(25., p.AScans, 0.5, 32)
+#
+# F.KeepElements(range(16,32))
+#
+# I1 = np.abs(np.array([F.PlaneWaveSweep(i, np.array([39.]), 2.33) for i in range(len(p.AScans))]))
+#
+# I1 = I1[:,0,:].transpose()
+#
+# fig, ax = plt.subplots(nrows=2)
+#
+# ax[0].imshow(I0[100:360,:], aspect=0.1)
+#
+# ax[1].imshow(I1[100:360,:], aspect=0.1)
+#
+# plt.show()
+#
+# del(F)
+#
+# yn = input("Scan Acceptable ? (y for yes, n for no)")
+#
+# if yn=='y':
+#
+#     p.SaveScans(scanpth+samplename+index+'.p',info)
+#
+#     del(p)
+#
+# else:
+#
+#     del(p)
+#
+#     pass
