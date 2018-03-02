@@ -478,10 +478,7 @@ class PeakNDT:
 
                 time.sleep(1e-3)
 
-            self.StopCapture.set()
-
-
-            print(len(self.Buffer))
+            self.StopBuffering()
 
             indstart = int(0)
             indstop = int(0)
@@ -510,7 +507,7 @@ class PeakNDT:
 
                 time.sleep(1e-3)
 
-            self.StopCapture.set()
+            self.StopBuffering()
 
             indstart = 0
             indstop = 0
@@ -523,10 +520,7 @@ class PeakNDT:
 
                 self.AScans.append(BytesToFloat(self.Buffer[indstart:indstop],self.PulserSettings['BitDepth']))
 
-        self.ScanCount = 0
-        self.Buffer = bytearray()
-
-        # self.StartBuffering()
+        self.StartBuffering()
 
     def StartBuffering(self):
 
@@ -534,13 +528,27 @@ class PeakNDT:
             Starts or restarts reading device buffer to local buffer
 
         """
-        if hasattr(self, 'BufferThread'):
-            del(self.BufferThread)
+        self.StopBuffering()
 
+        self.ScanCount = 0
+        self.Buffer = bytearray()
 
         self.StopCapture = threading.Event()
         self.BufferThread = threading.Thread(target = ReadBuffer, args = (self.Socket, self.Buffer, self.StopCapture))
         self.BufferThread.start()
+
+
+    def StopBuffering(self):
+
+        try:
+
+            self.StopCapture.set()
+            del(self.BufferThread)
+
+
+        except:
+            pass
+
 
 
     def ClearScans(self):
@@ -556,8 +564,8 @@ class PeakNDT:
         self.AScans = []
         self.ScanCount = 0
 
-        self.Socket.send(('STX 1\r').encode())
-        ReadExactly(self.Socket, 8)
+        # self.Socket.send(('STX 1\r').encode())
+        # ReadExactly(self.Socket, 8)
 
         self.Buffer = bytearray()
 
@@ -596,8 +604,7 @@ class PeakNDT:
 
     def __del__(self):
 
-        self.Socket.send(('STX 1\r').encode())
-        ReadExactly(self.Socket,8)
+        self.StopBuffering()
         self.Socket.close()
 
 
