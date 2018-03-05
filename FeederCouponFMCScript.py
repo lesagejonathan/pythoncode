@@ -38,7 +38,7 @@ scanspeed = 4.0
 
 els = list(range(1,17))+ list(range(65,65+16))
 
-NScan = int(np.round((circumference + 10.)/resolution))
+NScan = int(np.round((circumference/resolution)))
 
 dt = resolution/scanspeed
 
@@ -46,16 +46,24 @@ p = mp.PeakNDT(fsamp=25.)
 
 p.SetFMCCapture((els,els), Gate = (0., 49.), Voltage=200., Gain=70., Averages=0, PulseWidth = 1/10., FilterSettings=(4,1))
 
-ss = input('Press any Enter to start capturing')
+pc = input('Ensure Probes Connected to MicroPulse\n' + 'Ensure Start Position is Correct \n' + 'Ensure Couplant is Flowing \n' + '... Press Enter to Continue')
+
+ss = input('Press Enter to Start Scanning')
+
+print('Scan in Progress ... ')
 
 p.ExecuteCapture(NScan, dt)
 
-print('Finished Scan, Reading Data ...')
+print('Finished Scan, Reading Data ... OK to Change Setup')
 p.ReadBuffer()
 
-p.SaveScans(scanpth+samplename+index+'.p',info)
-
 print('Saving Data ...')
+p.SaveScans(scanpth+samplename+'_'+index+'.p',info)
+
+print('Finished Saving '+scanpth+samplename+'_'+index+'.p')
+
+del(p)
+
 
 # pos = np.linspace(0.,circumference,NScan)
 #

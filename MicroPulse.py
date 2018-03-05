@@ -387,23 +387,49 @@ class PeakNDT:
 
         self.SetPRF(1.5e6/(Gate[1]-Gate[0]))
 
-        for tr in Elements[0]:
+        for tr in range(len(Elements[0])):
 
-            self.Socket.send(('TXF '+str(tr)+' 0 -1\r').encode())
+            self.Socket.send(('TXF '+str(tr+1)+' 0 -1\r').encode())
 
-            self.Socket.send(('TXF '+str(tr)+' '+str(tr)+' 0\r').encode())
-            self.Socket.send(('TXN '+str(tr+256-1)+' '+str(tr)+'\r').encode())
+            print('TXF '+str(tr+1)+' 0 -1')
 
-            self.Socket.send(('RXF '+str(tr)+' 0 -1 0\r').encode())
+            self.Socket.send(('TXF '+str(tr+1)+' '+str(Elements[0][tr])+' 0\r').encode())
 
-            for rc in Elements[1]:
+            print('TXF '+str(tr+1)+' '+str(Elements[0][tr])+' 0')
 
-                self.Socket.send(('RXF '+str(tr)+' '+str(rc)+' 0 0\r').encode())
+            # self.Socket.send(('TXN '+str(tr+256-1)+' '+str(tr+1)+'\r').encode())
 
-            self.Socket.send(('RXN '+str(tr+256-1)+' '+str(tr)+'\r').encode())
+            self.Socket.send(('TXN '+str(tr+256)+' '+str(tr+1)+'\r').encode())
+
+
+            print('TXN '+str(tr+256-1)+' '+str(tr+1))
+
+
+            self.Socket.send(('RXF '+str(tr+1)+' 0 -1 0\r').encode())
+
+
+            print('RXF '+str(tr+1)+' 0 -1 0')
+
+            for rc in range(len(Elements[1])):
+
+                self.Socket.send(('RXF '+str(tr+1)+' '+str(Elements[1][rc])+' 0 0\r').encode())
+
+                print('RXF '+str(tr+1)+' '+str(Elements[1][rc])+' 0 0')
+
+            # self.Socket.send(('RXN '+str(tr+256-1)+' '+str(tr+1)+'\r').encode())
+
+            self.Socket.send(('RXN '+str(tr+256)+' '+str(tr+1)+'\r').encode())
+
+
+            print('RXN '+str(tr+256-1)+' '+str(tr+1))
+
+
 
 
         self.Socket.send(('SWP 1 '+str(256)+' - '+str(256+len(Elements[0])-1)+'\r').encode())
+
+        # self.Socket.send(('SWP 1 '+str(256)+' - '+str(256+len(Elements[0]))+'\r').encode())
+
 
         self.Socket.send(('GANS 1 '+str(int(self.ValidGain(Gain)))+'\r').encode())
         self.Socket.send(('GATS 1 '+str(gate[0])+' '+str(gate[1])+'\r').encode())
@@ -472,7 +498,9 @@ class PeakNDT:
 
 
 
-            totalscanbytes = self.ScanCount*Nt*Ntr*Nrc
+            totalscanbytes = self.ScanCount*(Nt*Ntr*Nrc+2)
+
+            print(Nt*Ntr*Nrc)
 
             while len(self.Buffer)<totalscanbytes:
 
@@ -520,7 +548,7 @@ class PeakNDT:
 
                 self.AScans.append(BytesToFloat(self.Buffer[indstart:indstop],self.PulserSettings['BitDepth']))
 
-        self.StartBuffering()
+        # self.StartBuffering()
 
     def StartBuffering(self):
 
