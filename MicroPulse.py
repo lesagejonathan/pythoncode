@@ -18,16 +18,26 @@ def ClosestValue(x,val):
 
 
 
-def BytesToFloat(x,depth):
+# def BytesToFloat(x,depth):
+#
+#     converter = {}
+#
+#     converter['8'] = lambda x : array([xx-2**7 for xx in x]).astype(float)
+#
+#     converter['16'] = lambda x : array([x[i]+x[i+1]*256 - 2**15 for i in range(0,len(x),2)]).astype(float)
+#
+#     return converter[str(depth)](x)
 
-    converter = {}
+def BytesToData(x,depth,datatype='int16'):
 
-    converter['8'] = lambda x : array([xx-2**7 for xx in x]).astype(float)
+    if int(depth) == 8:
 
-    converter['16'] = lambda x : array([x[i]+x[i+1]*256 - 2**15 for i in range(0,len(x),2)]).astype(float)
+        return array([xx-2**7 for xx in x]).astype(datatype)
 
+    elif int(depth) == 16:
 
-    return converter[str(depth)](x)
+        return array([x[i]+x[i+1]*256 - 2**15 for i in range(0,len(x),2)]).astype(datatype)
+
 
 def ReadExactly(sock,size):
 
@@ -487,7 +497,11 @@ class PeakNDT:
             * Add functionality to read scans from buffer and store them for
               sectorial scans, electronic scans, conventional tests, etc.
 
+             * Fix Conventional capture to read bytearray correctly
+
         """
+
+        from numpy import frombuffer
 
         Nt = int(self.ScanLength*(int(self.PulserSettings['BitDepth'])/8)+8)
 
@@ -496,11 +510,7 @@ class PeakNDT:
             Ntr = len(self.CaptureSettings['Elements'][0])
             Nrc = len(self.CaptureSettings['Elements'][1])
 
-
-
             totalscanbytes = self.ScanCount*(Nt*Ntr*Nrc+2)
-
-            print(Nt*Ntr*Nrc)
 
             while len(self.Buffer)<totalscanbytes:
 
@@ -513,15 +523,38 @@ class PeakNDT:
 
             for s in range(self.ScanCount):
 
-                A = zeros((Ntr, Nrc, self.ScanLength))
+                A = zeros((Ntr, Nrc, self.ScanLength),dtype='int16')
+
+                ibstart = int(s*(Nt*Ntr*Nrc+2))
+                ibstop = int(ibstart + Nt*Ntr*Nrc)
+
+                a = self.Buffer[ibstart:ibstop]
 
                 for tr in range(Ntr):
-                    for rc in range(Nrc):
 
-                        indstart = int(s*Ntr*Nrc*Nt+tr*Nrc*Nt+rc*Nt+8)
+                    for rc in range(Nrc):
+                        #
+                        # indstart = int(s*Ntr*Nrc*Nt+tr*Nrc*Nt+rc*Nt+8)
+                        #
+                        # indstop = int(indstart + Nt-8)
+
+                        indstart = int(tr*Nrc*Nt+rc*Nt+8)
+
                         indstop = int(indstart + Nt-8)
 
-                        A[tr,rc,:] = BytesToFloat(self.Buffer[indstart:indstop], self.PulserSettings['BitDepth'])
+                        # A[tr,rc,:] = BytesToFloat(a[indstart:indstop], self.PulserSettings['BitDepth'])
+
+                        # A[tr,rc,:] = frombuffer(self.Buffer[indstart:indstop], 'int'+str(self.PulserSettings['BitDepth']))
+
+                        # A[tr,rc,:] = frombuffer(a[indstart:indstop], 'int'+str(self.PulserSettings['BitDepth']))
+
+                        # A[tr,rc,:] = frombuffer(a[indstart:indstop], 'int16')
+
+                        A[tr,rc,:] = BytesToData(a[indstart:indstop], self.PulserSettings['BitDepth'], 'int16')
+
+
+
+
 
                 self.AScans.append(A)
 
@@ -548,7 +581,7 @@ class PeakNDT:
 
                 self.AScans.append(BytesToFloat(self.Buffer[indstart:indstop],self.PulserSettings['BitDepth']))
 
-        # self.StartBuffering()
+        self.StartBuffering()
 
     def StartBuffering(self):
 
