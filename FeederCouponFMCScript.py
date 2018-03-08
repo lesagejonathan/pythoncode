@@ -31,7 +31,7 @@ else:
     sys.exit()
 
 
-resolution = 1.
+resolution = 0.5
 scanspeed = 4.0
 
 # els = list(range(1,17))[-1::] + list(range(65,65+17))[-1::]
@@ -44,7 +44,7 @@ dt = resolution/scanspeed
 
 p = mp.PeakNDT(fsamp=25.)
 
-p.SetFMCCapture((els,els), Gate = (0., 49.), Voltage=200., Gain=70., Averages=0, PulseWidth = 1/10., FilterSettings=(4,1))
+p.SetFMCCapture((els,els), Gate = (0., 50.), Voltage=200., Gain=70., Averages=0, PulseWidth = 1/10., FilterSettings=(4,1))
 
 pc = input('Ensure Probes Connected to MicroPulse\n' + 'Ensure Start Position is Correct \n' + 'Ensure Couplant is Flowing \n' + '... Press Enter to Continue')
 
@@ -57,11 +57,47 @@ p.ExecuteCapture(NScan, dt)
 print('Finished Scan, Reading Data ... OK to Change Setup')
 p.ReadBuffer()
 
-print('Saving Data ...')
-p.SaveScans(scanpth+samplename+'_'+index+'.p',info)
+gate = (int(25*6), int(25*15))
 
-print('Finished Saving '+scanpth+samplename+'_'+index+'.p')
+p.AScans = [p.AScans[i][::-1,::-1,:] for i in range(len(p.AScans))]
 
+A = [p.AScans[i][0:15,0:15,gate[0]:gate[1]] for i in range(len(p.AScans))]
+
+F = FMC.LinearCapture(25.,A,0.5,16)
+
+I0 = F.PlaneWaveSweep(0,np.array([-39.]),2.33)
+
+I0 = np.abs(np.array(I0)[:,0,:]).transpose()
+
+del(A)
+del(F)
+
+A = [p.AScans[i][16::,16::,gate[0]:gate[1]] for i in range(len(p.AScans))]
+
+F = FMC.LinearCapture(25.,A,0.5,16)
+
+I1 = F.PlaneWaveSweep(0,np.array([-39.]),2.33)
+I1 = np.abs(np.array(I1)[:,0,:]).transpose()
+
+ax,fig = plt.subplots(nrows=2)
+
+ax[0].imshow(I0)
+ax[1].imshow(I1)
+
+plt.show()
+
+
+yn = input('Save Scan? Enter (y/n)')
+
+if yn=='y':
+
+    print('Saving Data ...')
+    p.SaveScans(scanpth+samplename+'_'+index+'.p',info)
+
+    print('Finished Saving '+scanpth+samplename+'_'+index+'.p')
+
+elif yn=='n':
+    print('Scan not Saved')
 del(p)
 
 

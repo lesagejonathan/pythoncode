@@ -1,6 +1,6 @@
 import socket
 import struct
-from numpy import array,zeros,log2
+from numpy import array,zeros,log2,frombuffer,int8,int16,uint8,uint16,int32
 from matplotlib.pylab import plot,show
 import _pickle
 # import numpy
@@ -32,11 +32,15 @@ def BytesToData(x,depth,datatype='int16'):
 
     if int(depth) == 8:
 
-        return array([xx-2**7 for xx in x]).astype(datatype)
+        # return array([xx-128 for xx in x]).astype(datatype)
+
+        return (frombuffer(x, uint8).astype(int16)-int16(128)).astype(datatype)
 
     elif int(depth) == 16:
 
-        return array([x[i]+x[i+1]*256 - 2**15 for i in range(0,len(x),2)]).astype(datatype)
+        # return array([x[i]+x[i+1]*256 - 2**15 for i in range(0,len(x),2)]).astype(datatype)
+
+        return (frombuffer(x, uint16).astype(int32)-int16(32768)).astype(datatype)
 
 
 def ReadExactly(sock,size):
@@ -523,7 +527,7 @@ class PeakNDT:
 
             for s in range(self.ScanCount):
 
-                A = zeros((Ntr, Nrc, self.ScanLength),dtype='int16')
+                A = zeros((Ntr, Nrc, self.ScanLength),dtype=self.PulserSettings['BitDepth'])
 
                 ibstart = int(s*(Nt*Ntr*Nrc+2))
                 ibstop = int(ibstart + Nt*Ntr*Nrc)
@@ -550,10 +554,7 @@ class PeakNDT:
 
                         # A[tr,rc,:] = frombuffer(a[indstart:indstop], 'int16')
 
-                        A[tr,rc,:] = BytesToData(a[indstart:indstop], self.PulserSettings['BitDepth'], 'int16')
-
-
-
+                        A[tr,rc,:] = BytesToData(a[indstart:indstop], self.PulserSettings['BitDepth'], 'int'+str(self.PulserSettings['BitDepth']))
 
 
                 self.AScans.append(A)
