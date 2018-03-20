@@ -17,11 +17,11 @@ circumference = float(sys.argv[2])
 
 index = sys.argv[3]
 
-if index=='A':
+if (index=='A') or (index=='a'):
 
     info = {'Circumference':circumference, 'IndexOffset': 'Index offset of 90 degrees skew covers HAZ'}
 
-elif index=='B':
+elif (index=='B') or (index=='b'):
 
     info = {'Circumference':circumference, 'IndexOffset': 'Index offset of 270 degrees skew covers HAZ'}
 
@@ -36,7 +36,8 @@ scanspeed = 4.0
 
 # els = list(range(1,17))[-1::] + list(range(65,65+17))[-1::]
 
-els = list(range(1,17))+ list(range(65,65+16))
+# els = list(range(1,17))+ list(range(65,65+16))
+els=list(range(1,33))
 
 NScan = int(np.round((circumference/resolution)))
 
@@ -61,11 +62,15 @@ gate = (int(25*6), int(25*15))
 
 p.AScans = [p.AScans[i][::-1,::-1,:] for i in range(len(p.AScans))]
 
-A = [p.AScans[i][0:15,0:15,gate[0]:gate[1]] for i in range(len(p.AScans))]
+# for i in range(len(p.AScans)):
+#
+#     p.AScans[i][0:16,0:16,:]
+
+A = [p.AScans[i][0:16,0:16,gate[0]:gate[1]] for i in range(len(p.AScans))]
 
 F = FMC.LinearCapture(25.,A,0.5,16)
 
-I0 = F.PlaneWaveSweep(0,np.array([-39.]),2.33)
+I0 = [F.PlaneWaveSweep(i,np.array([-39.]),2.33) for i in range(len(A))]
 
 I0 = np.abs(np.array(I0)[:,0,:]).transpose()
 
@@ -76,27 +81,29 @@ A = [p.AScans[i][16::,16::,gate[0]:gate[1]] for i in range(len(p.AScans))]
 
 F = FMC.LinearCapture(25.,A,0.5,16)
 
-I1 = F.PlaneWaveSweep(0,np.array([-39.]),2.33)
+I1 = [F.PlaneWaveSweep(i,np.array([-39.]),2.33) for i in range(len(A))]
 I1 = np.abs(np.array(I1)[:,0,:]).transpose()
 
-ax,fig = plt.subplots(nrows=2)
+fig,ax = plt.subplots(nrows=2)
 
-ax[0].imshow(I0)
-ax[1].imshow(I1)
+ax[0].imshow(I0, extent=[0.,circumference,27.,0.])
+ax[1].imshow(I1, extent=[0.,circumference,27.,0.])
+
+fig.savefig(scanpth+samplename+'_'+index+'.png',dpi=250)
 
 plt.show()
 
 
 yn = input('Save Scan? Enter (y/n)')
 
-if yn=='y':
+if (yn=='y') or (yn=='Y'):
 
     print('Saving Data ...')
     p.SaveScans(scanpth+samplename+'_'+index+'.p',info)
 
     print('Finished Saving '+scanpth+samplename+'_'+index+'.p')
 
-elif yn=='n':
+else:
     print('Scan not Saved')
 del(p)
 
