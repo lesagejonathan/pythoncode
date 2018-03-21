@@ -88,6 +88,8 @@ class PeakNDT:
         self.ClearScans()
         self.EncodedScan = False
 
+        self.StepsPerMeasure = (1,1,1,9)
+
         # self.StepsPerMeasure = 1.
         # self.AxisNumber = 4.
 
@@ -447,7 +449,7 @@ class PeakNDT:
 
             self.ScanCount += 1
 
-    def OneAxisEncoderCapture(self, StepsPerMeasure, Start, End, Pitch, SDT=1):
+    def OneAxisEncoderCapture(self, Start, End, Pitch):
 
         """IRPM = Input Ratio Per MM
         Pitch = Inspection Increment
@@ -463,17 +465,19 @@ class PeakNDT:
 
         self.Socket.send(('ENCF 0 0 0 0\r').encode())
 
-        self.Socket.send(('MPE 10 10 10 ' +  str(int(StepsPerMeasure)) + '\r').encode())
+        # self.Socket.send(('MPE 10 10 10 ' +  str(int(StepsPerMeasure)) + '\r').encode())
+
+        self.Socket.send(('MPE '+str(int(self.StepsPerMeasure[0]))+' '+str(int(self.StepsPerMeasure[1]))+' '+str(int(self.StepsPerMeasure[2]))+' '+str(int(self.StepsPerMeasure[3]))+'\r').encode())
 
         self.Socket.send(('BKL 20000 20000 20000 20000\r').encode())
 
-        self.Socket.send(('SPA 1 1 1 ' + str(Pitch) + '\r').encode())
+        self.Socket.send(('SPA '+str(Pitch)+' '+str(Pitch)+' '+str(Pitch)+'\r').encode())
 
-        # self.Socket.send(('LCP 1 0\r').encode())
-        #
-        # self.Socket.send(('LCP 2 0\r').encode())
-        #
-        # self.Socket.send(('LCP 3 0\r').encode())
+        self.Socket.send(('LCP 1 0\r').encode())
+
+        self.Socket.send(('LCP 2 0\r').encode())
+
+        self.Socket.send(('LCP 3 0\r').encode())
 
         self.Socket.send(('LCP 4 0\r').encode())
 
@@ -511,7 +515,7 @@ class PeakNDT:
 
             self.Socket.send(('FLM 3\r').encode())
 
-        self.Socket.send(('FLX 4 ' + str(Start) + ' 0\r').encode())
+        self.Socket.send(('FLX 4 ' + str(int(Start)) + ' 0\r').encode())
 
         # for m in range(len(Axis)):
         #
@@ -523,11 +527,11 @@ class PeakNDT:
         #
         #         self.Socket.send(('FLX ' + str(Axis[m]) + ' ' + str(Start[m]) + ' 1\r').encode())
 
-        self.Socket.send(('FLZ 4 ' + str(End) +'\r').encode())
+        self.Socket.send(('FLZ 4 ' + str(int(End)) +'\r').encode())
 
         self.EncodedScan = True
 
-    def ReadAxisLocation(self):
+    def ReadAxisLocations(self):
 
         """ Reads Encoder Position in steps for all axes (4 in total)
         returns a tuple of encoder giving the positions of each axis"""
@@ -549,63 +553,24 @@ class PeakNDT:
         #
         #     return (2**24 - a)*(-1)
 
-        return int.from_bytes([al[11],al[12],al[13]], byteorder='little', signed=True)
+        return (int.from_bytes([al[2],al[3],al[4]], byteorder='little', signed=True), int.from_bytes([al[5],al[6],al[7]], byteorder='little', signed=True), int.from_bytes([al[8],al[9],al[10]], byteorder='little', signed=True), int.from_bytes([al[11],al[12],al[13]], byteorder='little', signed=True))
 
         # al = ReadExactly(self.Socket,26)[7:23]
 
         # return tuple(frombuffer(al,int32))
 
-    def CalibrateEncoder(self,start,stop):
+    def CalibrateEncoder(self,start,stop,axis=3):
 
         input("Go to Start Position, Press Enter")
 
-        countstart = self.ReadAxisLocation()
+        countstart = self.ReadAxisLocation()[axis]
 
         input("Got to End Position, Press Enter")
 
-        countstop = self.ReadAxisLocation()
+        countstop = self.ReadAxisLocation()[axis]
 
-        StepsPerMeasure = abs((countstop - countstart)/(stop - start))
+        self.StepsPerMeasure[axis] = abs((countstop - countstart)/(stop - start))
 
-        return StepsPerMeasure
-
-        # if StepPerMeasure < 0:
-        #
-        #     Direction = 'Backward'
-        #
-        # else:
-        #
-        #     Direction = 'Forward'
-        #
-        # return (StepPerMeasure, Direction)
-
-    # def ReadEncoderStepPerMM(self, AxisNumber =1.):
-    #
-    #     self.StartBuffering()
-    #
-    #     self.CaptureSettings = {'CatpureType': 'EcnoderStepPerMM'}
-    #
-    #     self.Socket.send(('STS 1\r').encode())
-    #
-    #     self.ReadBuffer()
-    #
-    #     print(str(self.Buffer))
-    #
-    #     return BytesToFloat(self.Buffer[indstart:indstop])
-    #
-    # def ReadSetEncoderPitch(self, AxisNumber =1.):
-    #
-    #     self.StartBuffering()
-    #
-    #     self.CaptureSettings = {'CatpureType': 'EncoderPitch'}
-    #
-    #     self.Socket.send(('STS 5\r').encode())
-    #
-    #     self.ReadBuffer()
-    #
-    #     print(str(self.Buffer))
-    #
-    #     return BytesToFloat(self.Buffer[indstart:indstop])
 
     def ReadBuffer(self):
 
@@ -672,6 +637,7 @@ class PeakNDT:
 
             while len(self.Buffer)<totalscanbytes:
 
+                print(100.*len(self.Buffer)/totalscanbytes)
                 time.sleep(1e-3)
 
             self.StopBuffering()

@@ -8,9 +8,9 @@ class Controller:
 
         if instrument is 'ImmersionTank':
 
-            self.AxisKeys = {'X':'A','Y':'B','Z':'C','Rotation':'D'}
+            self.AxisKeys = {'X':'A','Y':'B','Z':'C','Rotation':'D','E':'Yaw','F':'Pitch'}
 
-            self.StepsPerMeasure = {'X':1000.,'Y':801.721016,'Z':1000.,'Rotation':160.*1000./360.}
+            self.StepsPerMeasure = {'X':1000.,'Y':801.721016,'Z':1000.,'Rotation':160.*1000./360.,'Pitch':266.666666667,'Yaw':1310.3}
 
             ip = '10.10.1.12'
 
