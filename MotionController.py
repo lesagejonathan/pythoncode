@@ -8,9 +8,9 @@ class Controller:
 
         if instrument is 'ImmersionTank':
 
-            self.AxisKeys = {'X':'A','Y':'B','Z':'C','Rotation':'D'}
+            self.AxisKeys = {'X':'A','Y':'B','Z':'C','Rotation':'D','E':'Yaw','F':'Pitch'}
 
-            self.StepsPerMeasure = {'X':1000.,'Y':801.721016,'Z':1000.,'Rotation':160.*1000./360.}
+            self.StepsPerMeasure = {'X':1000.,'Y':801.721016,'Z':1000.,'Rotation':160.*1000./360.,'Pitch':266.666666667,'Yaw':1310.3}
 
             ip = '10.10.1.12'
 
@@ -34,7 +34,6 @@ class Controller:
 
             self.ZeroEncoder(k)
 
-
     def Wait(self):
 
         inmotion = True
@@ -44,7 +43,6 @@ class Controller:
             axisinmotion = [self.CheckMotionComplete(axis) for axis in list(self.AxisKeys.keys())]
 
             inmotion = not(all(axisinmotion))
-
 
     def MoveRelative(self,Axis,Position,Speed, Wait=False):
         # set Speed
@@ -104,7 +102,6 @@ class Controller:
 
         return not(bool(int(float(self.Galil.GCommand('MG _BG'+self.AxisKeys[Axis])))))
 
-
     def MoveToLimit(self, Axis, Speed, Direction, Limit=5000):
 
 
@@ -129,7 +126,6 @@ class Controller:
                 while notlimit:
 
                     notlimit = bool(int(float(self.Galil.GCommand('MG _LR'+self.AxisKeys[Axis]))))
-
 
 
     def __del__(self):

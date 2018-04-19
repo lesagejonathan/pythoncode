@@ -16,8 +16,6 @@ def ClosestValue(x,val):
 
     return x[ClosestIndex(x,val)]
 
-
-
 # def BytesToFloat(x,depth):
 #
 #     converter = {}
@@ -70,12 +68,10 @@ def ReadBuffer(sock,buff,stopcapture,size=4096):
 
     return
 
-
-
 class PeakNDT:
 
-    def __init__(self,ip='192.168.1.150',port=1067, fsamp=25, bitdepth=16):
-
+    def __init__(self,ip='10.10.1.100',port=1067, fsamp=25, bitdepth=16):
+        # def __init__(self,ip='192.168.1.150',port=1067, fsamp=25, bitdepth=16):
 
         self.IP = ip
         self.Port = port
@@ -87,9 +83,15 @@ class PeakNDT:
         self.SetSamplingFrequency(fsamp)
         self.SetBitDepth(bitdepth)
 
+        # self.Socket.send(('ENCM 1\r').encode())
+
         self.ClearScans()
+        self.EncodedScan = False
 
+        self.StepsPerMeasure = (1,1,1,9)
 
+        # self.StepsPerMeasure = 1.
+        # self.AxisNumber = 4.
 
     def SetSamplingFrequency(self,fs=25):
 
@@ -160,7 +162,6 @@ class PeakNDT:
 
         return int(ClosestValue(vset, voltage))
 
-
     def ValidAverage(self,naverages):
 
         if naverages<=1:
@@ -210,7 +211,6 @@ class PeakNDT:
 
         return int(ClosestValue(wdthset,width*1e3))
 
-
     def SetPAFilter(self,filtersettings):
 
         fsettings = list(range(1,5))
@@ -229,7 +229,6 @@ class PeakNDT:
         wdthset = list(range(16,1012,2))
 
         return int(ClosestValue(wdthset,width*1e3))
-
 
     def ValidConventionalDamping(self, damping):
 
@@ -264,7 +263,6 @@ class PeakNDT:
         self.PulserSettings['BitDepth'] = bitd[str(res)][0]
 
         self.Socket.send((bitd[str(res)][1]).encode())
-
 
     def SetConventionalCapture(self, Channels, Gate, Voltage = 100., Gain = 20., Averages = 0 , PulseWidth = 1/10., Damping = 660.):
 
@@ -346,7 +344,7 @@ class PeakNDT:
 
         self.StartBuffering()
 
-    def SetFMCCapture(self, Elements, Gate, Voltage=100., Gain=20., Averages=0, PulseWidth = 1/10., FilterSettings=(4,1)):
+    def SetFMCCapture(self, Elements, Gate, Voltage=200., Gain=70., Averages=0, PulseWidth = 1/10., FilterSettings=(4,1)):
 
         """ Sets FMC Type Capture to be executed
 
@@ -378,16 +376,11 @@ class PeakNDT:
 
         """
 
-        #
-        # self.Socket.send(('STX 1\r').encode())
-        # ReadExactly(self.Socket,24)
-
         self.SetPAFilter(FilterSettings)
 
         if type(Elements) is int:
 
             Elements = (range(1,Elements+1), range(1,Elements+1))
-
 
         self.Socket.send(('PAW '+str(Elements[0][0])+' '+str(Elements[0][-1])+' '+str(self.ValidPAPulseWidth(PulseWidth))+'\r').encode())
 
@@ -405,45 +398,19 @@ class PeakNDT:
 
             self.Socket.send(('TXF '+str(tr+1)+' 0 -1\r').encode())
 
-            print('TXF '+str(tr+1)+' 0 -1')
-
             self.Socket.send(('TXF '+str(tr+1)+' '+str(Elements[0][tr])+' 0\r').encode())
-
-            print('TXF '+str(tr+1)+' '+str(Elements[0][tr])+' 0')
-
-            # self.Socket.send(('TXN '+str(tr+256-1)+' '+str(tr+1)+'\r').encode())
 
             self.Socket.send(('TXN '+str(tr+256)+' '+str(tr+1)+'\r').encode())
 
-
-            print('TXN '+str(tr+256-1)+' '+str(tr+1))
-
-
             self.Socket.send(('RXF '+str(tr+1)+' 0 -1 0\r').encode())
-
-
-            print('RXF '+str(tr+1)+' 0 -1 0')
 
             for rc in range(len(Elements[1])):
 
                 self.Socket.send(('RXF '+str(tr+1)+' '+str(Elements[1][rc])+' 0 0\r').encode())
 
-                print('RXF '+str(tr+1)+' '+str(Elements[1][rc])+' 0 0')
-
-            # self.Socket.send(('RXN '+str(tr+256-1)+' '+str(tr+1)+'\r').encode())
-
             self.Socket.send(('RXN '+str(tr+256)+' '+str(tr+1)+'\r').encode())
 
-
-            print('RXN '+str(tr+256-1)+' '+str(tr+1))
-
-
-
-
         self.Socket.send(('SWP 1 '+str(256)+' - '+str(256+len(Elements[0])-1)+'\r').encode())
-
-        # self.Socket.send(('SWP 1 '+str(256)+' - '+str(256+len(Elements[0]))+'\r').encode())
-
 
         self.Socket.send(('GANS 1 '+str(int(self.ValidGain(Gain)))+'\r').encode())
         self.Socket.send(('GATS 1 '+str(gate[0])+' '+str(gate[1])+'\r').encode())
@@ -455,13 +422,7 @@ class PeakNDT:
                                 'Gate':Gate,'Voltage': Voltage, 'Gain': Gain,
                                 'Averages': Averages, 'PulseWidth':PulseWidth, 'FilterSettings':FilterSettings}
 
-
-        # self.StopCapture = threading.Event()
-        # self.BufferThread = threading.Thread(target = ReadBuffer, args = (self.Socket, self.Buffer, ReadLength, self.StopCapture))
-        # self.BufferThread.start()
-
         self.StartBuffering()
-
 
     def ExecuteCapture(self, NExecutions=1, TimeBetweenCaptures = None):
 
@@ -488,6 +449,127 @@ class PeakNDT:
 
             self.ScanCount += 1
 
+    def OneAxisEncoderCapture(self, Start, End, Pitch):
+
+        """IRPM = Input Ratio Per MM
+        Pitch = Inspection Increment
+        SDT = Stall Detection Time in Second
+
+        Is Written for Axis 4"""
+
+        self.ScanCount = int(round((End-Start)/Pitch))
+
+        self.Socket.send(('ENCM 0\r').encode())
+
+        self.Socket.send(('ENCT 0 0 0 0\r').encode())
+
+        self.Socket.send(('ENCF 0 0 0 0\r').encode())
+
+        # self.Socket.send(('MPE 10 10 10 ' +  str(int(StepsPerMeasure)) + '\r').encode())
+
+        self.Socket.send(('MPE '+str(int(self.StepsPerMeasure[0]))+' '+str(int(self.StepsPerMeasure[1]))+' '+str(int(self.StepsPerMeasure[2]))+' '+str(int(self.StepsPerMeasure[3]))+'\r').encode())
+
+        self.Socket.send(('BKL 20000 20000 20000 20000\r').encode())
+
+        self.Socket.send(('SPA '+str(Pitch)+' '+str(Pitch)+' '+str(Pitch)+'\r').encode())
+
+        self.Socket.send(('LCP 1 0\r').encode())
+
+        self.Socket.send(('LCP 2 0\r').encode())
+
+        self.Socket.send(('LCP 3 0\r').encode())
+
+        self.Socket.send(('LCP 4 0\r').encode())
+
+        # enct=''
+        # encf=''
+        # mpe=''
+        # bkl=''
+        # spa=''
+        #
+        # for m in range(len(Axis)):
+        #
+        #     enct = enct + ' 0'
+        #     encf = encf + ' 0'
+        #     mpe = mpe + ' ' + str(IRPM[m])
+        #     bkl = bkl + ' ' + str(SDT)
+        #     spa = spa + ' ' + str(Pitch[m])
+        #
+        #     self.Socket.send(('LCP ' + str(Axis[m]) + ' 0\r' ).encode())
+        #
+        # self.Socket.send(('ENCT' + enct + '\r').encode())
+        #
+        # self.Socket.send(('ENCF' + encf + '\r').encode())
+        #
+        # self.Socket.send(('MPE' + mpe + '\r').encode())
+        #
+        # self.Socket.send(('BKL' + bkl + '\r').encode())
+        #
+        # self.Socket.send(('SPA' + spa + '\r').encode())
+
+        if self.CaptureSettings['CaptureType']=='Conventional':
+
+            self.Socket.send(('FLM 0\r').encode())
+
+        else:
+
+            self.Socket.send(('FLM 3\r').encode())
+
+        self.Socket.send(('FLX 4 ' + str(int(Start)) + ' 0\r').encode())
+
+        # for m in range(len(Axis)):
+        #
+        #     if Direction[m] == 'Forward':
+        #
+        #         self.Socket.send(('FLX ' + str(Axis[m]) + ' ' + str(Start[m]) + ' 0\r').encode())
+        #
+        #     else:
+        #
+        #         self.Socket.send(('FLX ' + str(Axis[m]) + ' ' + str(Start[m]) + ' 1\r').encode())
+
+        self.Socket.send(('FLZ 4 ' + str(int(End)) +'\r').encode())
+
+        self.EncodedScan = True
+
+    def ReadAxisLocations(self):
+
+        """ Reads Encoder Position in steps for all axes (4 in total)
+        returns a tuple of encoder giving the positions of each axis"""
+
+        self.Socket.send(('STS 0\r').encode())
+
+        al = ReadExactly(self.Socket,18)
+        #
+        # a = al[11] + al[12]*2**8 + al[13]*2**16
+        #
+        # # a = al[11]*2**8 + al[12]*2**16 + al[13]*2**24
+        #
+        #
+        # if a < 2**23:
+        #
+        #     return a
+        #
+        # else:
+        #
+        #     return (2**24 - a)*(-1)
+
+        return (int.from_bytes([al[2],al[3],al[4]], byteorder='little', signed=True), int.from_bytes([al[5],al[6],al[7]], byteorder='little', signed=True), int.from_bytes([al[8],al[9],al[10]], byteorder='little', signed=True), int.from_bytes([al[11],al[12],al[13]], byteorder='little', signed=True))
+
+        # al = ReadExactly(self.Socket,26)[7:23]
+
+        # return tuple(frombuffer(al,int32))
+
+    def CalibrateEncoder(self,start,stop,axis=3):
+
+        input("Go to Start Position, Press Enter")
+
+        countstart = self.ReadAxisLocation()[axis]
+
+        input("Got to End Position, Press Enter")
+
+        countstop = self.ReadAxisLocation()[axis]
+
+        self.StepsPerMeasure[axis] = abs((countstop - countstart)/(stop - start))
 
 
     def ReadBuffer(self):
@@ -502,14 +584,13 @@ class PeakNDT:
               sectorial scans, electronic scans, conventional tests, etc.
 
              * Fix Conventional capture to read bytearray correctly
-
         """
 
         from numpy import frombuffer
 
         Nt = int(self.ScanLength*(int(self.PulserSettings['BitDepth'])/8)+8)
 
-        if self.CaptureSettings['CaptureType'] == 'FMC':
+        if (self.CaptureSettings['CaptureType'] == 'FMC')&(self.EncodedScan==False):
 
             Ntr = len(self.CaptureSettings['Elements'][0])
             Nrc = len(self.CaptureSettings['Elements'][1])
@@ -527,7 +608,7 @@ class PeakNDT:
 
             for s in range(self.ScanCount):
 
-                A = zeros((Ntr, Nrc, self.ScanLength),dtype=self.PulserSettings['BitDepth'])
+                A = zeros((Ntr, Nrc, self.ScanLength),dtype='int'+str(self.PulserSettings['BitDepth']))
 
                 ibstart = int(s*(Nt*Ntr*Nrc+2))
                 ibstop = int(ibstart + Nt*Ntr*Nrc)
@@ -537,33 +618,58 @@ class PeakNDT:
                 for tr in range(Ntr):
 
                     for rc in range(Nrc):
-                        #
-                        # indstart = int(s*Ntr*Nrc*Nt+tr*Nrc*Nt+rc*Nt+8)
-                        #
-                        # indstop = int(indstart + Nt-8)
 
                         indstart = int(tr*Nrc*Nt+rc*Nt+8)
 
                         indstop = int(indstart + Nt-8)
-
-                        # A[tr,rc,:] = BytesToFloat(a[indstart:indstop], self.PulserSettings['BitDepth'])
-
-                        # A[tr,rc,:] = frombuffer(self.Buffer[indstart:indstop], 'int'+str(self.PulserSettings['BitDepth']))
-
-                        # A[tr,rc,:] = frombuffer(a[indstart:indstop], 'int'+str(self.PulserSettings['BitDepth']))
-
-                        # A[tr,rc,:] = frombuffer(a[indstart:indstop], 'int16')
 
                         A[tr,rc,:] = BytesToData(a[indstart:indstop], self.PulserSettings['BitDepth'], 'int'+str(self.PulserSettings['BitDepth']))
 
 
                 self.AScans.append(A)
 
+        elif (self.CaptureSettings['CaptureType'] == 'FMC')&(self.EncodedScan==True):
+
+            Ntr = len(self.CaptureSettings['Elements'][0])
+            Nrc = len(self.CaptureSettings['Elements'][1])
+
+            totalscanbytes = self.ScanCount*(Nt*Ntr*Nrc+5)
+
+            while len(self.Buffer)<totalscanbytes:
+
+                print(100.*len(self.Buffer)/totalscanbytes)
+                time.sleep(1e-3)
+
+            self.StopBuffering()
+
+            indstart = int(0)
+            indstop = int(0)
+
+            for s in range(self.ScanCount):
+
+                A = zeros((Ntr, Nrc, self.ScanLength),dtype='int'+str(self.PulserSettings['BitDepth']))
+
+                ibstart = int(s*(Nt*Ntr*Nrc)+5*(s+1))
+                ibstop = int(ibstart + Nt*Ntr*Nrc)
+
+                a = self.Buffer[ibstart:ibstop]
+
+                for tr in range(Ntr):
+
+                    for rc in range(Nrc):
+
+                        indstart = int(tr*Nrc*Nt+rc*Nt+8)
+
+                        indstop = int(indstart + Nt-8)
+
+                        A[tr,rc,:] = BytesToData(a[indstart:indstop], self.PulserSettings['BitDepth'], 'int'+str(self.PulserSettings['BitDepth']))
+
+
+                self.AScans.append(A)
 
         elif self.CaptureSettings['CaptureType'] == 'Conventional':
 
-
-            totalscanbytes = self.ScanCount*(Nt+8)
+            totalscanbytes = self.ScanCount*(Nt+8) * self.NumberofEncoderCaptures
 
             while len(self.Buffer)<totalscanbytes:
 
@@ -582,8 +688,6 @@ class PeakNDT:
 
                 self.AScans.append(BytesToFloat(self.Buffer[indstart:indstop],self.PulserSettings['BitDepth']))
 
-        self.StartBuffering()
-
     def StartBuffering(self):
 
         """
@@ -599,7 +703,6 @@ class PeakNDT:
         self.BufferThread = threading.Thread(target = ReadBuffer, args = (self.Socket, self.Buffer, self.StopCapture))
         self.BufferThread.start()
 
-
     def StopBuffering(self):
 
         try:
@@ -610,8 +713,6 @@ class PeakNDT:
 
         except:
             pass
-
-
 
     def ClearScans(self):
 
@@ -630,7 +731,6 @@ class PeakNDT:
         # ReadExactly(self.Socket, 8)
 
         self.Buffer = bytearray()
-
 
     def SaveScans(self,Filename, ScanInfo = None, Reversed=False):
 
