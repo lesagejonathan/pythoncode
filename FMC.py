@@ -2,6 +2,25 @@ from functools import reduce
 import numpy as np
 from numpy.fft import rfft, ifft, fftn, ifftn, fftshift
 from pathos.multiprocessing import ProcessingPool
+import os
+import multiprocessing
+
+def NumericalAperture(x,y,L):
+
+    x,y = np.meshgrid(x,y)
+
+    rp = np.sqrt((x - L/2)**2 + y**2)
+
+    rm = np.sqrt((x + L/2)**2 + y**2)
+
+    A = np.sin(0.5*np.arccos((rp**2 + rm**2 - L**2)/(2*rp*rm)))
+
+    A[0,:] = A[1,:]
+
+    return A
+
+
+
 
 
 def NextPow2(x):
@@ -170,7 +189,7 @@ def EstimateDirectivityAttenuation(
 
 class LinearCapture:
 
-    def __init__(self, fs, scans, p, N, probedelays=None, elementamps=None):
+    def __init__(self, fs, scans, p, N, probedelays=None):
 
         import copy
 
@@ -187,94 +206,79 @@ class LinearCapture:
 
             self.ProbeDelays = probedelays
 
-        if elementamps is None:
-
-            self.ElementAmplitudes = np.ones((N, N))
-
-        else:
-
-            self.ElementAmplitudes = elementamps
 
         self.AScans = copy.deepcopy(scans)
 
-        # if wedgeparams is not None:
-        #
-        #     self.WedgeParameters = wedgeparams.copy()
+        self.AScans = [a.astype(np.float)/32768. for a in self.AScans]
 
-    def ProcessScans(self, zeropoints=0, bp=10, T0 = None):
+        self.AmplitudeCorrection = None
 
-        from scipy.signal import detrend
+
+    def ProcessScans(self, zeropoints=20, bp=10):
+
+        from scipy.signal import detrend, hilbert
 
         L = self.AScans[0].shape[2]
 
+        d = np.round(self.ProbeDelays*self.SamplingFrequency).astype(int)
+
+        dmax = np.amax(d)
+
+        if dmax<zeropoints:
+
+            for i in range(len(self.AScans)):
+
+                for m in range(self.NumberOfElements):
+
+                    for n in range(self.NumberOfElements):
+
+                        self.AScans[i][m,n,0:zeropoints-d[m,n]] = 0.
+
+                self.AScans[i] = hilbert(detrend(self.AScans[i], bp=list(np.arange(0, L, bp).astype(int))))
+
         # Lpad = NextPow2(np.round((L + np.amax(self.ProbeDelays)*self.SamplingFrequency - 1)))
-
-        Lpad = int(
-            np.round(
-                (L +
-                 np.amax(
-                     self.ProbeDelays) *
-                    self.SamplingFrequency -
-                    1)))
-
-        f = np.linspace(0., self.SamplingFrequency / 2, np.floor(Lpad / 2) + 1)
-
-        f = f.reshape((1, 1, len(f)))
-
-        D = np.exp(
-            2j * np.pi * np.repeat(self.ProbeDelays[:, :, np.newaxis], f.shape[2], 2) * f)
-
-        A = np.repeat(self.ElementAmplitudes[:, :, np.newaxis], f.shape[2], 2).astype(
-            np.complex64)
-
-        for i in range(len(self.AScans)):
-
-            if zeropoints != 0:
-                self.AScans[i][:, :, 0:zeropoints] = 0.0
-
-            self.AScans[i] = detrend(
-                self.AScans[i], bp=list(
-                    np.linspace(
-                        0, L - 1, bp).astype(int)))
-
-            X = rfft(self.AScans[i], n=Lpad)
-
-            self.AScans[i] = self.AScans[i].astype(np.complex64)
-
-            self.AScans[i] = 2 * ifft((X / A) * D, n=Lpad)[:, :, 0:L]
-
-        if T0 is not None:
-
-            Npad = int(round(T0*self.SamplingFrequency))
-
-            zpad = np.zeros(Npad,dtype=np.complex64)
-
-            self.AScans = [np.concatenate((zpad, a)) for a in self.AScans]
-
-
-
-    # def RemoveProbeDelays(self):
-    #
-    #     d = int(np.round(self.Delays*self.SamplingFrequency))
-    #
-    #     dmax = np.max(d)
-    #
-    #     for i in range(len(self.AScans)):
-    #
-    #         x = np.zeros(())
-    #
-    #
-    #
-    #         self.AScans[i][:,:,] = x[]
-    #
-    #
-    # def ApplyWindow(self):
-    #
-    #
-    #
-    # def ApplyBandpass(self):
-    #
-    #
+        #
+        # Lpad = int(
+        #     np.round(
+        #         (L +
+        #          np.amax(
+        #              self.ProbeDelays) *
+        #             self.SamplingFrequency -
+        #             1)))
+        #
+        # f = np.linspace(0., self.SamplingFrequency / 2, np.floor(Lpad / 2) + 1)
+        #
+        # f = f.reshape((1, 1, len(f)))
+        #
+        # D = np.exp(
+        #     2j * np.pi * np.repeat(self.ProbeDelays[:, :, np.newaxis], f.shape[2], 2) * f)
+        #
+        # A = np.repeat(self.ElementAmplitudes[:, :, np.newaxis], f.shape[2], 2).astype(
+        #     np.complex64)
+        #
+        # for i in range(len(self.AScans)):
+        #
+        #     if zeropoints != 0:
+        #         self.AScans[i][:, :, 0:zeropoints] = 0.0
+        #
+        #     self.AScans[i] = detrend(
+        #         self.AScans[i], bp=list(
+        #             np.linspace(
+        #                 0, L - 1, bp).astype(int)))
+        #
+        #     X = rfft(self.AScans[i], n=Lpad)
+        #
+        #     self.AScans[i] = self.AScans[i].astype(np.complex64)
+        #
+        #     self.AScans[i] = 2 * ifft((X / A) * D, n=Lpad)[:, :, 0:L]
+        #
+        # if T0 is not None:
+        #
+        #     Npad = int(round(T0*self.SamplingFrequency))
+        #
+        #     zpad = np.zeros(Npad,dtype=np.complex64)
+        #
+        #     self.AScans = [np.concatenate((zpad, a)) for a in self.AScans]
 
     def PlaneWaveSweep(self, ScanIndex, Angles, c):
 
@@ -338,42 +342,85 @@ class LinearCapture:
 
             return np.array([PlaneWaveFocus((ta, ta)) for ta in Angles])
 
-    def GetContactDelays(self, xrng, yrng, c, ampcorr=None):
+    def GetContactDelays(self, xrng, yrng, c):
 
-        from scipy.interpolate import griddata
-        # if c is None:
-        #
-        #     c = self.Velocity
+        if c is None:
 
-        self.Delays = [[[np.sqrt((x - n * self.Pitch)**2 + y**2) / c for y in yrng]
-                        for x in xrng] for n in range(self.NumberOfElements)]
+            c = self.Velocity
+
+        # self.Delays = [[[np.sqrt((x - n * self.Pitch)**2 + y**2) / c for y in yrng]
+        #                 for x in xrng] for n in range(self.NumberOfElements)]
+
+        xn = np.linspace(-(self.NumberOfElements-1)*self.Pitch*0.5, (self.NumberOfElements-1)*self.Pitch*0.5, self.NumberOfElements)
+
+        x,y = np.meshgrid(xrng, yrng)
+
+
+        # self.Delays = [np.sqrt((x - n*self.Pitch)**2 + y**2)/c for n in range(self.NumberOfElements)]
+
+        self.Delays = [np.sqrt((x - xn[n])**2 + y**2)/c for n in range(self.NumberOfElements)]
+
+
+        # self.GetDelayIndices()
+
 
         self.xRange = xrng.copy()
 
         self.yRange = yrng.copy()
 
-        if ampcorr is not None:
+    # def GetDelayIndices(self):
+    #
+    #         self.DelayIndices = [[[int(np.round(self.Delays[n][ix][iy]*self.SamplingFrequency)) for iy in range(len(self.Delays[0][0]))] for ix in range(len(self.Delays[0]))] for n in range(len(self.Delays))]
+    #
 
-            xyi = np.meshgrid(ampcorr['x'], ampcorr['y'])
+    def GetContactCorrections(self, x,y,amplitude,sensitivity=None, isongrid=False):
 
-            xyi = (xyi[0].ravel(), xyi[1].ravel())
+        from scipy.interpolate import griddata
 
-            self.AmplitudeCorrection = []
+        if isongrid:
 
-            for n in range(len(self.NumberOfElements)):
+            xyi = np.meshgrid(x, y)
 
-                xyp = np.meshgrid(xrng - n * self.Pitch, yrng)
+            xyi = (xyi[0].flatten(), xyi[1].flatten())
 
-                self.AmplitudeCorrection.append(
-                    list(
-                        griddata(
-                            xyi,
-                            ampcorr['AmplitudeCorrection'].ravel(),
-                            (xyp[0].flatten(),
-                             xyp[1].flatten()),
-                            fill_value=np.nan,
-                            method='linear').reshape(
-                            xyi[0].shape)))
+        else:
+
+            xyi = (x.flatten(), y.flatten())
+
+
+        # if sensitivity is not None:
+        #
+        #     sensitivity = np.sqrt(sensitivity/np.amax(sensitivity))
+
+        self.AmplitudeCorrection = []
+
+        for n in range(self.NumberOfElements):
+
+            xyp = np.meshgrid(self.xRange - n * self.Pitch, self.yRange)
+
+            if sensitivity is not None:
+
+                A = griddata(xyi,sensitivity[n]*amplitude.flatten(),(xyp[0].flatten(),xyp[1].flatten()),fill_value=np.nan,method='linear').reshape(xyp[0].shape)
+
+
+
+            else:
+
+                A = griddata(xyi,amplitude.flatten(),(xyp[0].flatten(),xyp[1].flatten()),fill_value=np.nan,method='linear').reshape(xyp[0].shape)
+
+
+
+            ind = np.where(np.isfinite(A[0,:]))[0]
+
+
+            A[:,0:ind[0]]=A[:,ind[0]].reshape((-1,1))
+
+            A[:,ind[-1]::]=A[:,ind[-1]].reshape((-1,1))
+
+            self.AmplitudeCorrection.append(A)
+
+
+
 
     # def GetWedgeDelays(self, xrng, yrng):
     #
@@ -660,10 +707,10 @@ class LinearCapture:
 
         return 2 * ifftn(X, s=(X.shape[0], L), axes=(0, 2))
 
-    def ApplyTFM(self, ScanIndex, FilterParams=None, AsParallel=False):
-
-        IX = len(self.Delays[0])
-        IY = len(self.Delays[0][0])
+    def ApplyTFM(self, ScanIndex, FilterParams=None, stablecoeff=1e-4, Normalize=False):
+        #
+        # IX = len(self.Delays[0])
+        # IY = len(self.Delays[0][0])
 
         if FilterParams is None:
 
@@ -678,301 +725,133 @@ class LinearCapture:
                 FilterParams[2],
                 FilterParams[3])
 
+
         # L = self.AScans[ScanIndex].shape[2]
         #
-        # L = a.shape[2]
+        L = a.shape[2]
+
+        t = np.linspace(0.,L-1,L)/self.SamplingFrequency
         #
-        # Nd = len(self.Delays)
+
 
         # delaytype = (len(self.Delays) == len(self.AScans))
+        #
+        # if self.AmplitudeCorrection is None:
+        #
+        #     def PointFocus(pt):
+        #
+        #     # Nd = len(self.Delays)
+        #
+        #         ix = pt[0]
+        #         iy = pt[1]
+        #
+        #
+        #
+        #         I = 0.+0j
+        #
+        #         for m in range(Nd):
+        #             for n in range(Nd):
+        #
+        #                 try:
+        #
+        #                     d = int(np.round((self.Delay[m][ix][iy]+self.Delay[n][ix][iy])*self.SamplingFrequency))
+        #
+        #                     I += a[m,n,int(d)]
+        #
+        #                 except:
+        #
+        #                     pass
+        #
+        #         return I
+        #
+        #
+        #         # return reduce(lambda x, y: x +y, (a[m, n, int(np.round((self.Delays[m][ix][iy]+self.Delays[n][ix][iy]) * self.SamplingFrequency))] if (np.isfinite(self.Delays[m][ix][iy])\
+        #         # and np.isfinite(self.Delays[n][ix][iy]) and int(round((self.Delays[m][ix][iy]+self.Delays[n][ix][iy]) * self.SamplingFrequency)) < L)\
+        #         # else 0. +0j for n in range(Nd) for m in range(Nd)))
+        #
+        #
+        # else:
+        #
+        #     def PointFocus(pt):
+        #
+        #         ix = pt[0]
+        #         iy = pt[1]
+        #
+        #
+        #         I = 0.+0j
+        #
+        #         for m in range(Nd):
+        #             for n in range(Nd):
+        #
+        #                 try:
+        #
+        #                     d = int(np.round((self.Delay[m][ix][iy]+self.Delay[n][ix][iy])*self.SamplingFrequency))
+        #
+        #                     A = self.self.AmplitudeCorrection[m][iy,ix]*self.AmplitudeCorrection[n][iy,ix]
+        #
+        #                     if (not(np.isnan(A))):
+        #
+        #                         I += a[m,n,int(d)]/(A+stablecoeff)
+        #
+        #                 except:
+        #
+        #                     pass
+        #
+        #         return I
+        #
+        #         # return reduce(lambda x, y: x +y, (a[m, n, int(np.round((self.Delays[m][ix][iy]+self.Delays[n][ix][iy])*self.SamplingFrequency))]/(self.AmplitudeCorrection[m][iy,ix]*self.AmplitudeCorrection[n][iy,ix] + stablecoeff)
+        #         # if (np.isfinite(self.Delays[m][ix][iy]) and np.isfinite(self.Delays[n][ix][iy]) and np.isfinite(self.AmplitudeCorrection[m][iy,ix]) and np.isfinite(self.AmplitudeCorrection[n][iy,ix])
+        #         # and int(round((self.Delays[m][ix][iy]+self.Delays[n][ix][iy])*self.SamplingFrequency)) < L) else 0.+0j for n in range(Nd) for m in range(Nd)))
+        #
+        # if AsParallel:
+        #
+        #     pool_size = multiprocessing.cpu_count()
+        #     os.system('taskset -cp 0-%d %s' % (pool_size, os.getpid()))
+        #
+        #     return np.array(
+        #         ProcessingPool(pool_size).map(
+        #             PointFocus, [
+        #                 (ix, iy) for ix in range(IX) for iy in range(IY)])).reshape(
+        #         (IX, IY)).transpose()
+        #
+        # else:
+        #
+        #     return np.array([PointFocus((ix, iy)) for ix in range(IX)
+        #                      for iy in range(IY)]).reshape((IX, IY)).transpose()
 
-        def PointFocus(pt):
 
-            # Nd = len(self.Delays)
 
-            ix = pt[0]
-            iy = pt[1]
+        if self.AmplitudeCorrection is None:
 
-            # return reduce(lambda x,y: x+y,
-            # (A[m,n,int(round((self.Delays[m][ix][iy] + self.Delays[n][ix][iy]
-            # + self.ProbeDelays[m,n])*self.SamplingFrequency))] if
-            # ((type(self.Delays[n][ix][iy]) is float or float64) and
-            # type(self.Delays[m][ix][iy]) is float or float64) else 0.+0j for
-            # n in range(Nd) for m in range(Nd)))
+            def ElementFocus(m,n):
 
-            # if  :
-            #
-            #
-            # else:
-            #
-            #     return reduce(lambda x, y: x +y, (a[m, n, int(np.round((self.Delays[m][ix][iy]+
-            #                 self.Delays[n][ix][iy]) * self.SamplingFrequency))]
-            #                 if (np.isfinite(self.Delays[m][ix][iy]) and np.isfinite(self.Delays[n][ix][iy])
-            #                 and int(round((self.Delays[m][ix][iy]+
-            #                 self.Delays[n][ix][iy]) * self.SamplingFrequency)) < L)
-            # else 0. +0j for n in range(Nd) for m in range(Nd)))
+                I = np.interp((self.Delays[m]+self.Delays[n]).flatten(),t,a[m,n,:])
 
-            # return reduce(lambda x,y: x+y,
-            # (A[m,n,int(round((self.Delays[m][ix][iy] + self.Delays[n][ix][iy]
-            # + self.ProbeDelays[m,n])*self.SamplingFrequency))] if (
-            # isfinite(self.Delays[m][ix][iy]) and
-            # isfinite(self.Delays[n][ix][iy]) and
-            # int(round((self.Delays[m][ix][iy] + self.Delays[n][ix][iy] +
-            # self.ProbeDelays[m,n])*self.SamplingFrequency)) < L) else 0.+0j
-            # for n in range(Nd) for m in range(Nd)))
+                np.nan_to_num(I,copy=False)
 
-        # return array([PointFocus(ix,iy,a) for ix in range(IX) for iy in
-        # range(IY)]).reshape((IX,IY)).transpose()
-
-        if AsParallel:
-
-            return np.array(
-                ProcessingPool().map(
-                    PointFocus, [
-                        (ix, iy) for ix in range(IX) for iy in range(IY)])).reshape(
-                (IX, IY)).transpose()
+                return I
 
         else:
 
-            return np.array([PointFocus((ix, iy)) for ix in range(IX)
-                             for iy in range(IY)]).reshape((IX, IY)).transpose()
+            def ElementFocus(m,n):
 
-    def PhasedArrayImage(
-            self,
-            ScanIndex,
-            Angles,
-            c,
-            Resolution,
-            SweepArray=None):
+                I = np.interp((self.Delays[m]+self.Delays[n]).flatten(),t,a[m,n,:])
 
-        from scipy.interpolate import griddata
+                I = I/((self.AmplitudeCorrection[m]*self.AmplitudeCorrection[n]+stablecoeff).flatten())
 
-        if SweepArray is None:
+                np.nan_to_num(I,copy=False)
 
-            a = np.abs(self.PlaneWaveSweep(ScanIndex, Angles, c))
+                return I
 
-        else:
 
-            a = SweepArray
+        I = reduce(lambda x,y: x+y, (ElementFocus(m,n) for m in range(self.NumberOfElements) for n in range(self.NumberOfElements))).reshape(self.Delays[0].shape)
 
-        r = np.linspace(
-            0., c * a.shape[1] / (2 * self.SamplingFrequency), a.shape[1]).reshape(1, -1)
+        if Normalize:
 
-        angrad = Angles.reshape(-1, 1) * np.pi / 180.
-
-        x = r * np.sin(angrad)
-        # y = r/np.cos(angrad)
-
-        y = r * np.cos(angrad)
-
-        xmin = np.min(x)
-        xmax = np.max(x)
-
-        xgrid = np.linspace(
-            xmin, xmax, int(
-                np.round(
-                    xmax - xmin) / Resolution))
-
-        ymin = np.min(y)
-        ymax = np.max(y)
-
-        ygrid = np.linspace(
-            ymin, ymax, int(
-                np.round(
-                    ymax - ymin) / Resolution))
-
-        xygrid = np.meshgrid(xgrid, ygrid)
-
-        I = griddata(
-            (x.flatten(),
-             y.flatten()),
-            a.flatten(),
-            (xygrid[0].flatten(),
-             xygrid[1].flatten()),
-            method='cubic',
-            fill_value=0.,
-            rescale=True)
-
-        # I = griddata((x.flatten(), y.flatten()), a.flatten(), (xygrid[0].flatten(), xygrid[1].flatten()), method='nearest', fill_value=0., rescale = False)
-
-        I = I.reshape(xygrid[0].shape)
-
-        # I[I>100.]=100.
-
-        # I =
+            I/np.amax(np.abs(I))
 
         return I
 
-    def AdvancedPhasedArrayImage(
-            self,
-            ScanIndex,
-            Angles,
-            c,
-            L,
-            fband,
-            Resolution,
-            SweepArray=None):
-
-        from scipy.interpolate import griddata
-
-        # from scipy import integrate
-        #
-        # a = np.abs(self.PlaneWaveSweep(ScanIndex, Angles, c))
-        #
-        # angrad = np.pi*np.array(Angles).reshape(a.shape)/180.
-        #
-        # A = a*np.exp(1j*(np.pi + np.angrad))
-        #
-        # xgrid = np.linspace()
-        #
-        # ygrid = np.linspace()
-        #
-        # def CoefficientMatrix(th, pt):
-
-        if SweepArray is None:
-
-            a = np.real(self.PlaneWaveSweep(ScanIndex, Angles, c))
-
-        else:
-
-            a = SweepArray
-
-        A = rfft(a)
-
-        # print(a.shape)
-
-        # print(A.shape)
-
-        f = np.linspace(0., self.SamplingFrequency /
-                        2, A.shape[-1]).reshape(1, -1)
-
-        indf = (f >= fband[0]) & (f <= fband[1])
-        indf = np.array(indf).flatten()
-
-        # print(indf.shape)
-
-        A = A[:, indf]
-
-        w = 2 * np.pi * f[:, indf]
-
-        # print(A.shape)
-        # print(w.shape)
-
-        angrad = np.pi * np.array(Angles).reshape(-1, 1) / 180.
-
-        # AA = A*np.cos(angrad)
-
-        # print(AA.shape)
-
-        # AA = A
-
-        # print(AA.shape)
-
-        kx = 2 * w * np.sin(angrad) / c
-
-        ky = 2 * w * np.cos(angrad) / c
-
-        # print(kx)
-
-        # ky = 2*w/(c*np.cos(angrad))
-
-        # ky = 2*np.sqrt((w/c)**2 - kx**2 + 0j)
-        # ky = np.real(ky)+0j
-
-        # ky = ((w/c)**2)/ky
-        #
-        # AA = A*(ky/(w/c))
-        # AA = A*np.cos(angrad)*(np.real(ky)>=0.)
-
-        AA = A / np.cos(angrad)
-
-        # AA = A
-
-        # ky = 2*w*np.cos(angrad)/c
-
-        # print(ky)
-
-        # print(ky.shape)
-
-        # ky = np.sqrt((w/c)**2 - kx**2 + 0j)
-
-        # ky = np.real(ky)
-        # L = c*(a.shape[-1]/self.SamplingFrequency)*0.5
-
-        # Nx = np.round(L[0]/self.Pitch)
-        #
-        # kymax = 2*np.pi*fmax/c
-        #
-        # dy = np.pi/(2*kymax)
-        #
-        # Ny = np.round(L[1],dy)
-        #
-        # kxgrid = 2*np.pi*np.linspace(-1/(2*self.Pitch), 1/(2*self.Pitch), Nx)
-        #
-        # kygrid = np.linspace(0.,kymax, Ny)
-
-        # Nx = int(np.round(L[0]/Resolution))
-        #
-        # Ny = int(np.round(L[1]/(2*Resolution)))
-        #
-        # kxgrid = 2*np.pi*np.linspace(-1/(2*Resolution),1/(2*Resolution), Nx)
-        #
-        # # kygrid = 2*np.linspace(0.,1/(2*Resolution), Ny)
-        #
-        # kygrid = 2*np.pi*np.linspace(0,1/(2*Resolution), Ny)
-
-        Nx = int(np.round(L[0] / self.Pitch))
-
-        # Ny = int(np.round(L[1]/(2*self.Pitch)))
-
-        dy = c / (2 * fband[1])
-
-        Ny = int(np.round(L[1] / (2 * dy)))
-
-        kxgrid = 2 * np.pi * \
-            np.linspace(-1 / (2 * self.Pitch), 1 / (2 * self.Pitch), Nx)
-
-        kygrid = 2 * np.pi * np.linspace(0, 1 / (2 * dy), Ny)
-
-        kgrid = np.meshgrid(kxgrid, kygrid)
-
-        # print(kx)
-        # print(kxgrid)
-
-        # print(kx.shape)
-        # print(ky.shape)
-        #
-        # print(AA.shape)
-        #
-        # print(kxgrid.shape)
-        # print(kygrid.shape)
-        #
-        # print(kgrid[0].shape)
-        # print(kgrid[1].shape)
-
-        I = griddata(
-            (kx.flatten(),
-             ky.flatten()),
-            AA.flatten(),
-            (kgrid[0].flatten(),
-             kgrid[1].flatten()),
-            method='cubic',
-            fill_value=0 + 0j,
-            rescale=True).reshape(
-            kgrid[0].shape)
-
-        # print(Nx)
-        # print(Ny)
-        # print(I.shape)
-
-        # return np.abs(fftshift(ifftn(I,axes=(1,0),s=(Nx,2*Ny - 2)),
-        # axes=(1,)))
-
-        Nx = int(np.round(L[0] / Resolution))
-        Ny = int(np.round(L[1] / (2 * Resolution)))
-
-        return np.abs(
-            fftshift(ifftn(I, axes=(1, 0), s=(Nx, 2 * Ny - 2)), axes=(1,)))
 
     def AttenuationTomography(
         self, ScanIndex, RefIndex, c, d, fband, fpower, resolution=(
