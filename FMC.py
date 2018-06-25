@@ -189,7 +189,7 @@ def EstimateDirectivityAttenuation(
 
 class LinearCapture:
 
-    def __init__(self, fs, scans, p, N, probedelays=None):
+    def __init__(self, fs, scans, p, N, probedelays=None, WedgeParameters=None):
 
         import copy
 
@@ -213,10 +213,13 @@ class LinearCapture:
 
         self.AmplitudeCorrection = None
 
+        self.WedgeParameters = WedgeParameters
 
-    def ProcessScans(self, zeropoints=20, bp=10):
+
+    def ProcessScans(self, zeropoints=20, bp=10, normalize=True):
 
         from scipy.signal import detrend, hilbert
+        from numpy.linalg import norm
 
         L = self.AScans[0].shape[2]
 
@@ -235,6 +238,17 @@ class LinearCapture:
                         self.AScans[i][m,n,0:zeropoints-d[m,n]] = 0.
 
                 self.AScans[i] = hilbert(detrend(self.AScans[i], bp=list(np.arange(0, L, bp).astype(int))))
+
+                if normalize:
+
+                    self.AScans[i] = self.AScans[i]/norm(self.AScans[i])
+
+
+
+    def ReverseElements(self):
+
+        self.AScans = [a[::-1,::-1,:] for a in self.AScans]
+
 
         # Lpad = NextPow2(np.round((L + np.amax(self.ProbeDelays)*self.SamplingFrequency - 1)))
         #
@@ -422,33 +436,112 @@ class LinearCapture:
 
 
 
-    # def GetWedgeDelays(self, xrng, yrng):
-    #
-    #     from scipy.optimize import minimize
-    #
-    #     p = self.Pitch
-    #     h = self.WedgeParameters['Height']
-    #
-    #     cw = self.WedgeParameters['Velocity']
-    #
-    #     cphi = np.cos(self.WedgeParameters['Angle'] * np.pi / 180.)
-    #     sphi = np.sin(self.WedgeParameters['Angle'] * np.pi / 180.)
-    #
-    #     c = self.Velocity
-    #
-    #     def f(x,X,Y,n):
-    #         return np.sqrt((h + n * p * sphi)**2 + (cphi * n * p - x)**2) / cw + np.sqrt(Y**2 + (X - x)**2) / c
-    #
-    #     def J(x,X,Y,n):
-    #         return -(cphi * n * p - x) / (cw * np.sqrt((h + n * p * sphi)**2 + (cphi * n * p - x)**2)) - \
-    #                 (X - x) / (c * np.sqrt(Y**2 + (X - x)**2))
-    #
-    #     self.Delays = [[[minimize(f,x0=0.5 * np.abs(x - n * self.Pitch * cphi),
-    #                     args=(x,y,n),method='BFGS',jac=J).fun for y in yrng] for x in xrng]
-    #                    for n in range(self.NumberOfElements)]
-    #
-    #     self.xRange = xrng.copy()
-    #     self.yRange = yrng.copy()
+    def GetWedgeDelays(self, xrng, yrng, c):
+
+        from scipy.optimize import minimize_scalar,minimize
+        # from scipy.optimize import brentq
+
+        p = self.Pitch
+        h = self.WedgeParameters['Height']
+
+        cw = self.WedgeParameters['Velocity']
+
+        cphi = np.cos(self.WedgeParameters['Angle'] * np.pi / 180.)
+        sphi = np.sin(self.WedgeParameters['Angle'] * np.pi / 180.)
+
+        # x,y = np.meshgrid(xrng,yrng)
+
+
+        # def f(x,X,Y,n):
+        #
+        #     return np.sqrt((h + n * p * sphi)**2 + (cphi * n * p - x)**2) / cw + np.sqrt(Y**2 + (X - x)**2) / c
+        # #
+        # def J(x,X,Y,n):
+        #     return -(cphi * n * p - x) / (cw * np.sqrt((h + n * p * sphi)**2 + (cphi * n * p - x)**2)) - \
+        #             (X - x) / (c * np.sqrt(Y**2 + (X - x)**2))
+
+
+        # def f(x,X,Y,n):
+        #
+        #     return (x - cphi*n*p)*(c * np.sqrt(Y**2 + (X - x)**2))/(cw * np.sqrt((h + n * p * sphi)**2 + (x - cphi*n*p)**2)) - (X - x)
+
+
+        # self.Delays = [np.array([[minimize(f,x0=0.5 * np.abs(x - n * self.Pitch * cphi),
+        #                 args=(x,y,n),method='BFGS',jac=J).fun for y in yrng] for x in xrng])
+        #                for n in range(self.NumberOfElements)]
+
+
+        def f(X,Y,n):
+
+            P = np.zeros(5)
+
+            P[0]=-c**2 + cw**2
+            P[1]=2*X*c**2 - 2*X*cw**2 + 2*c**2*cphi*n*p - 2*cphi*cw**2*n*p
+            P[2]=-X**2*c**2 + X**2*cw**2 - 4*X*c**2*cphi*n*p + 4*X*cphi*cw**2*n*p - Y**2*c**2 - c**2*cphi**2*n**2*p**2 + cphi**2*cw**2*n**2*p**2 + cw**2*h**2 + 2*cw**2*h*n*p*sphi + cw**2*n**2*p**2*sphi**2
+            P[3]=2*X**2*c**2*cphi*n*p - 2*X**2*cphi*cw**2*n*p + 2*X*c**2*cphi**2*n**2*p**2 - 2*X*cphi**2*cw**2*n**2*p**2 - 2*X*cw**2*h**2 - 4*X*cw**2*h*n*p*sphi - 2*X*cw**2*n**2*p**2*sphi**2 + 2*Y**2*c**2*cphi*n*p
+            P[4]=-X**2*c**2*cphi**2*n**2*p**2 + X**2*cphi**2*cw**2*n**2*p**2 + X**2*cw**2*h**2 + 2*X**2*cw**2*h*n*p*sphi + X**2*cw**2*n**2*p**2*sphi**2 - Y**2*c**2*cphi**2*n**2*p**2
+
+            r = np.roots(P)
+
+            r = r[(np.real(r)>=0.)&(~(np.abs(np.imag(r))>0.))]
+
+
+            if len(r)>0:
+
+                x = np.real(r[0])
+
+                return np.sqrt((h + n * p * sphi)**2 + (cphi * n * p - x)**2) / cw + np.sqrt(Y**2 + (X - x)**2) / c
+
+            else:
+
+                return np.nan
+
+
+        x,y = np.meshgrid(xrng,yrng)
+
+        ComputeDelays = np.vectorize(f,excluded=['n'])
+
+        self.Delays = [ComputeDelays(x,y,n) for n in range(self.NumberOfElements)]
+
+
+        # ComputeDelays = np.vectorize(f)
+
+        # self.Delays = []
+        #
+        # for n in range(self.NumberOfElements):
+        #
+        #     ComputeDelays = np.vectorize(f)
+        #
+        #     self.Delays.append(ComputeDelays(x,y))
+
+
+
+
+
+
+        # def ComputeDelay(n,x,y):
+        #
+        #     try:
+        #         # return brentq(f,n*p*cphi, (x-n*p*cphi)*(h+n*p*sphi)/(y+h+n*p*sphi), args=(x,y,n),xtol=1e-6)
+        #
+        #         # return minimize_scalar(f,(n*p*cphi,(x-n*p*cphi)*(h+n*p*sphi)/(y+h+n*p*sphi)),args = (x,y,n),tol=1e-4,options={'maxiter':30}).x
+        #         # return brentq(f,n*p*cphi, x, args=(x,y,n),xtol=-6)
+        #
+        #         return minimize(f,0.5*(n*p*cphi + (x-n*p*cphi)*(h+n*p*sphi)/(y+h+n*p*sphi)),args=(x,y,n),jac=J,tol=1e-4,options={'maxiter':20}).fun
+        #
+        #
+        #     except ValueError:
+        #
+        #         return np.nan
+
+        # self.Delays = [np.array([[brentq(f, n*p*cphi, (x-n*p*cphi)*(h+n*p*sphi)/(y+h+n*p*sphi), args=(x,y,n)) for x in xrng] for y in yrng]) for n in range(self.NumberOfElements)]
+
+        # self.Delays = [np.array([[ComputeDelay(n,x,y) for y in yrng] for x in xrng]) for n in range(self.NumberOfElements)]
+
+
+
+        self.xRange = xrng.copy()
+        self.yRange = yrng.copy()
 
     def KeepElements(self, Elements):
 
@@ -462,13 +555,15 @@ class LinearCapture:
                 Elements,
                 axis=1)
 
-        self.ProbeDelays = np.take(
-            np.take(
-                self.ProbeDelays,
+        if self.ProbeDelays is not None:
+
+            self.ProbeDelays = np.take(
+                np.take(
+                    self.ProbeDelays,
+                    Elements,
+                    axis=0),
                 Elements,
-                axis=0),
-            Elements,
-            axis=1)
+                axis=1)
 
         self.NumberOfElements = len(Elements)
 
