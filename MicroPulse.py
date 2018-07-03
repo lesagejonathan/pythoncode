@@ -70,7 +70,7 @@ def ReadBuffer(sock,buff,stopcapture,size=4096):
 
 class PeakNDT:
 
-    def __init__(self,ip='10.10.1.100',port=1067, fsamp=25, bitdepth=16):
+    def __init__(self,ip='192.168.1.150',port=1067, fsamp=25, bitdepth=16):
         # def __init__(self,ip='192.168.1.150',port=1067, fsamp=25, bitdepth=16):
 
         self.IP = ip
@@ -471,7 +471,7 @@ class PeakNDT:
 
         self.Socket.send(('BKL 20000 20000 20000 20000\r').encode())
 
-        self.Socket.send(('SPA '+str(Pitch)+' '+str(Pitch)+' '+str(Pitch)+'\r').encode())
+        self.Socket.send(('SPA '+str(Pitch)+' '+str(Pitch)+' '+str(Pitch)+' '+str(Pitch)+'\r').encode())
 
         self.Socket.send(('LCP 1 0\r').encode())
 
@@ -563,13 +563,17 @@ class PeakNDT:
 
         input("Go to Start Position, Press Enter")
 
-        countstart = self.ReadAxisLocation()[axis]
+        countstart = self.ReadAxisLocations()[axis]
+        # countstart = self.ReadAxisLocations()
 
         input("Got to End Position, Press Enter")
 
-        countstop = self.ReadAxisLocation()[axis]
+        countstop = self.ReadAxisLocations()[axis]
+        # countstop = self.ReadAxisLocations()
 
-        self.StepsPerMeasure[axis] = abs((countstop - countstart)/(stop - start))
+        self.StepsPerMeasure[axis] = abs((countstop - countstart)/(stop - start))*10
+
+        # return(abs((countstop - countstart)/(stop - start))*10)
 
 
     def ReadBuffer(self):
@@ -637,7 +641,7 @@ class PeakNDT:
 
             while len(self.Buffer)<totalscanbytes:
 
-                print(100.*len(self.Buffer)/totalscanbytes)
+                print(100.*len(self.Buffer)/totalscanbytes,end='\r')
                 time.sleep(1e-3)
 
             self.StopBuffering()

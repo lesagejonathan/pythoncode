@@ -316,3 +316,45 @@ def EstimateProbeDelays(Scans,fsamp,p,h,c=5.92):
 
 
     return Delays
+
+
+def EstimateAttenuation(x,y,fs,d,fband,fdepend=(0,1,4)):
+
+    from scipy.signal import detrend
+    from numpy.linalg import lstsq
+    from numpy.fft import rfft
+    from numpy import linspace, hstack, log, abs, ones
+
+    NFFT = len(x)+len(y)-1
+
+    X = rfft(detrend(x), NFFT)
+    Y = rfft(detrend(y), NFFT)
+
+    f = linspace(0.,fs/2,len(X))
+
+    indf = (f>=fband[0]) & (f<=fband[1])
+
+    X = X[indf].reshape(-1,1)
+    Y = Y[indf].reshape(-1,1)
+
+    f = f[indf].reshape(-1,1)
+
+    F = ones(f.shape)
+
+
+    for n in range(len(fdepend)):
+
+        F = hstack((F,d*f**fdepend[n]))
+
+    G = log(abs(X)/abs(Y))
+
+    alpha = lstsq(F,G)[0]
+
+    return alpha
+
+# def EstimateUsableBandwidth(X,fs):
+#
+#     from misc import moments
+#     from numpy import linspace
+#
+#     f = linspace(0.,fs/2, len(X))

@@ -1590,15 +1590,19 @@ class FMC:
             wp['VerticalFL'] = vfl
             wp['HorizontalFL'] = hfl
 
-            T = [[ DirectDelays(pth,elements,x,y,wp) for x in X] for y in Y]
+            # T = [[ DirectDelays(pth,elements,x,y,wp) for x in X] if abs(y)<=hfl else list(nan*ones(len(X))) for y in Y]
+
+            T = [[ DirectDelays(pth,elements,x,y,wp) for x in X] for y in Y if abs(y)<=hfl]
+
 
             I = zeros((len(Y),len(X)),dtype='complex')
 
-            for iy in range(len(Y)):
+            for iy in range(len(T)):
 
-                for ix in range(len(X)):
+                for ix in range(len(T[iy])):
 
                     I[iy,ix] = reduce(lambda x,y:x+y, [self.AScans[ScanIndex][m,n,int(round(T[iy][ix][m][n]*self.SamplingFrequency))] if isfinite(T[iy][ix][m][n]) else 0+0j for m in elements[0] for n in elements[1]])
+
 
             return I
 
@@ -1609,6 +1613,7 @@ class FMC:
             if X is 'sidewall':
 
                 X = array([wp['SideWallPosition']])
+
 
             # I = zeros((len(Y),len(X)))
 

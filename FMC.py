@@ -1,4 +1,3 @@
-hi
 from functools import reduce
 import numpy as np
 from numpy.fft import rfft, ifft, fftn, ifftn, fftshift
@@ -22,8 +21,6 @@ def NumericalAperture(x,y,L):
 
 
 
-
-
 def NextPow2(x):
     return int(2**int(np.ceil(np.log2(x))))
 
@@ -41,7 +38,7 @@ def FitRBF(x, f, beta):
                                  x.reshape(1, -1))**2), f.reshape(-1, 1))
 
 
-def EstimateProbeDelays(Scans, fsamp, p, h, c=5.92):
+def EstimateProbeDelays(Scans, fsamp, p, h, hfraction=0.1, c=5.92):
 
     from scipy.signal import hilbert
 
@@ -50,7 +47,9 @@ def EstimateProbeDelays(Scans, fsamp, p, h, c=5.92):
 
     x = np.abs(hilbert(Scans, axis=2))
 
-    W = int(np.round(fsamp * 0.25 * h / c))
+    W = int(np.round(fsamp * hfraction * h / c))
+
+    print(W)
 
     Delays = np.zeros((M, N))
 
@@ -1382,4 +1381,4 @@ class LinearCapture:
 
 
 
-        return I, G
+        return I

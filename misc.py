@@ -1367,3 +1367,240 @@ def MatMultiply(a):
     from functools import reduce
 
     return reduce(lambda x,y: dot(y,x), (aa for aa in a))
+
+def BeamSize(f,c,D,F):
+
+    N = (D**2)/(4*(c/f))
+
+    SF = F/N
+
+    D6dB = 0.2568*D*SF
+
+    Fz = (N*SF**2)*(2/(1+0.5*SF))
+
+    return D6dB, Fz
+
+# def LambDispersion(h,f,cL,cT,krange,mode='Antisymmetric'):
+#
+#     from scipy.optimize import brentq
+#     from numpy import tan,sqrt,pi
+#
+#     # def p(k):
+#     #
+#     #     return sqrt(((2*pi*f/cL)**2 - k**2)+0j)
+#     #
+#     # def q(k):
+#     #
+#     #     return sqrt(((2*pi*f/cT)**2 - k**2)+0j)
+#
+#     # p = lambda k: sqrt(((2*pi*f/cL)**2 - k**2)+0j)
+#     #
+#     # q = lambda k: sqrt(((2*pi*f/cT)**2 - k**2)+0j)
+#
+#
+#     # if mode == 'Antisymmetric':
+#
+#     if mode =='Antisymmetric':
+#
+#         def g(k):
+#
+#             p = sqrt(((2*pi*f/cL)**2 - k**2)+0j)
+#             q = sqrt(((2*pi*f/cT)**2 - k**2)+0j)
+#
+#             return (4*p*q*k**2)*tan(q*h) + tan(p*h)*(q**2 - k**2)**2
+#
+#     elif mode =='Symmetric':
+#
+#         def g(k):
+#
+#             p = sqrt(((2*pi*f/cL)**2 - k**2)+0j)
+#             q = sqrt(((2*pi*f/cT)**2 - k**2)+0j)
+#
+#
+#             return (4*p*q*k**2)*tan(p*h) + tan(q*h)*(q**2 - k**2)**2
+#
+#     return brentq(g,krange[0],krange[1])
+
+
+def LambDispersion(h,k,f,cL,cT,mode='Antisymmetric'):
+
+    from scipy.optimize import brentq
+    from numpy import tan,sqrt,pi,real,abs
+
+    # def p(k):
+    #
+    #     return sqrt(((2*pi*f/cL)**2 - k**2)+0j)
+    #
+    # def q(k):
+    #
+    #     return sqrt(((2*pi*f/cT)**2 - k**2)+0j)
+
+    # p = lambda k: sqrt(((2*pi*f/cL)**2 - k**2)+0j)
+    #
+    # q = lambda k: sqrt(((2*pi*f/cT)**2 - k**2)+0j)
+
+
+    # if mode == 'Antisymmetric':
+
+    k = k.reshape(-1,1)
+
+    f = f.reshape(1,-1)
+
+    p = sqrt(((2*pi*f/cL)**2 - k**2)+0j)
+    q = sqrt(((2*pi*f/cT)**2 - k**2)+0j)
+
+    h = h/2.
+
+
+    if mode =='Antisymmetric':
+
+        return abs((4*p*q*k**2)*tan(q*h) + tan(p*h)*(q**2 - k**2)**2)
+
+
+    elif mode =='Symmetric':
+
+
+        return abs((4*p*q*k**2)*tan(p*h) + tan(q*h)*(q**2 - k**2)**2)
+
+    else:
+
+        return None
+
+# def EstimateWedgeParameters(x0,p,n,m,Tmn,dmn,cw=2.33):
+#
+#     from numpy import cos,sin,pi,array,arcsin
+#     from scipy.optimize import root
+#
+#
+#
+#     # x0 = [x0[0], sin(pi*x0[1]/180.)]
+#     # m = array(m)
+#     # n = array(n)
+#     # Tmn = array(Tmn)
+#     # dmn = array(dmn)
+#     #
+#     # # f = lambda x: (cw**2)*(Tmn - dmn)**2 - (cos(x[0]*pi/180.)*(n - m)*p)**2 - (2*x[1] + p*(m+n)*sin(x[0]*pi/180.))**2
+#     #
+#     # f = lambda x: (cw*(Tmn - dmn))**2 - 4*x[0]**2 - 2*x[0]*p*(m+n)*x[1] - (n**2 + m**2)*p**2 - 4*m*n*(p*x[1])**2 + 2*m*n*p**2
+#     #
+#     # R = root(f,x0)
+#
+#     print(R['x'])
+#
+#
+#
+#     xr = (R['x'][0], 180.*arcsin(R['x'][1])/pi)
+#
+#     return R['success'], xr
+
+
+def EstimateWedgeParameters(x,fs,n,d,p,cw=2.33):
+
+    from numpy import cos,sin,pi,array,arcsin,abs, argmax
+    from matplotlib.pylab import plot, close, ginput
+
+    h = []
+    phi = []
+
+    for nn in n:
+
+        xm = abs(x[nn[0],nn[0],:])
+        xn = abs(x[nn[1],nn[1],:])
+
+        plot(xm)
+        plot(xn)
+
+        inds = ginput(4,timeout=0)
+
+        close()
+
+        Tm = (argmax(xm[int(inds[0][0]):int(inds[1][0])]) + int(inds[0][0]))/fs
+        Tn = (argmax(xn[int(inds[2][0]):int(inds[3][0])]) + int(inds[2][0]))/fs
+
+        sphi = (Tn - Tm + d[nn[0]] - d[nn[1]])*cw/(2*p*(nn[1]-nn[0]))
+
+        h.append((Tm - d[nn[0]])*cw/2. - p*nn[0]*sphi)
+        h.append((Tn - d[nn[1]])*cw/2. - p*nn[1]*sphi)
+
+        phi.append(180.*arcsin(sphi)/pi)
+
+
+    return array(h),array(phi)
+
+
+def InverseLogNormalCDF(p,mu,sigma):
+
+
+    0.5 + 0.5*erf((log(x)-mu)/(sqrt(2)*sigma)
+
+# def CycloidIntersections(X,R):
+#
+#     from scipy.optimize import brentq
+#     from numpy import amin, amax, sqrt, array, nan, arctan2, arccos, pi, zeros, cos, sin, tan
+#
+#     # r = R/2
+#
+#     # x0 = r*pi
+#
+#     def x(t):
+#
+#         # return r*(t-sin(t))
+#
+#         return R*t + r*sin(t)
+#
+#     def y(t):
+#
+#         # return r*(1-cos(t))
+#
+#         return r*cos(t)
+#
+#     def f(t,X):
+#
+#         # return y(t)*sin(t) - (X - x(t))*(cos(t)-1)
+#
+#
+#
+#
+#     # a = 1e-3
+#     # b = 2*R
+#
+#     # def g(x,X):
+#     #
+#     #     return (f(x)-X)*dfdx(x)
+#
+#     # def f(y):
+#     #
+#     #     return x0-r*arccos(1-y/r) + sqrt(y*(2*r-y))
+#     #
+#     # def g(y,X):
+#     #
+#     #     return -(x0 - r*arccos(1-y/r) + sqrt(y*(2*r-y)) - X)*(1/sqrt(1-(1-y/r)**2) + (y-r)/sqrt(y*(2*r-y))) - y
+#     #
+#     #
+#     # # yi = [brentq(g,a,b,args=xx,full_output=True) for xx in X]
+#     # #
+#     # # yi = array([yy[0] if yy[1].converged else nan for yy in yi])
+#     #
+#     ti = zeros(len(X))
+#     #
+#     for i in range(len(X)):
+#
+#         try:
+#
+#             t = brentq(f,1e-6,pi,args=X[i],full_output=True)
+#
+#             if t[1]:
+#
+#                 ti[i] = t[0]
+#
+#             else:
+#
+#                 ti[i] = nan
+#
+#         except:
+#
+#             ti[i] = nan
+#     #
+#     # xi =
+#
+#     return x(ti),y(ti)

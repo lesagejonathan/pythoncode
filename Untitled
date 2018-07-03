@@ -1,0 +1,11 @@
+
+
+L =
+v =
+h =
+
+cw = 2.33
+ac = arctan2(h,v)
+
+xc = l - 0.5v
+yc = 0.5*h + L
