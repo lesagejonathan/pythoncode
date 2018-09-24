@@ -21,7 +21,6 @@ Ps = TT*sp.exp(1j*w*(sp.sin(th)*x/cw + sp.sqrt((1/csT)**2 - (sp.sin(th)/cw)**2)*
 
 uw = [sp.diff(pw,x), sp.diff(pw,y)]
 
-us = [sp.diff(ps,x) + sp.diff(Ps,y), sp.diff(ps,y) -  sp.diff(Ps,x)]
 
 sw = (rhow*cw**2)*sp.diff(uw[1],y)
 

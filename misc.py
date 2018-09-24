@@ -1527,11 +1527,11 @@ def EstimateWedgeParameters(x,fs,n,d,p,cw=2.33):
 
     return array(h),array(phi)
 
-
-def InverseLogNormalCDF(p,mu,sigma):
-
-
-    0.5 + 0.5*erf((log(x)-mu)/(sqrt(2)*sigma)
+# 
+# def InverseLogNormalCDF(p,mu,sigma):
+#
+#
+#     0.5 + 0.5*erf((log(x)-mu)/(sqrt(2)*sigma)
 
 # def CycloidIntersections(X,R):
 #

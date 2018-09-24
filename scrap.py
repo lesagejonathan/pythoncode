@@ -1,4 +1,31 @@
 import numpy as np
+from numpy.fft import rfft, irfft,ifftshift
+
+
+def TargetConvolution(l,FWHM,dx):
+
+    N = int(10*FWHM/dx)
+
+    c = FWHM/(2.*np.sqrt(2.*np.log(2.)))
+
+    s = np.linspace(0.,1/(2*dx),N)
+
+
+    H = np.sinc(l*s)*l
+
+    G = np.exp(-2*(c**np.pi*s)**2)*np.sqrt(np.pi*2)*c
+
+    f = ifftshift(irfft(H*G))
+
+    f = f/(np.amax(np.abs(f)))
+
+    ind = np.where(f>=0.5)[0]
+
+    FWHMout = len(ind)*dx
+
+    return f,FWHMout
+
+
 import _pickle as pickle
 import FMC
 import os
